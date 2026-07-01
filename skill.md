@@ -250,6 +250,7 @@ API 维度影响优先级:
 | `{{#has_db}}...{{/has_db}}` | 条件 inline: 维度命中时展开 |
 | `{{USER_REDLINES_DATABASE}}` | 用户输入 | 用户输入的逐条红线 |
 | `{{USER_REDLINES_API}}` | 用户输入 | 用户输入的 API 维度逐条红线 |
+| `{{DIM_INDEX}}` | 维度顺序 | 维度段章节号; base.md 固定 3.1-3.4, 维度段从 3.5 起: code 总是 3.5, 其后 database/api/deploy/maintenance 按命中顺序递增 3.6/3.7/..., 未命中不插入, 编号连续无空洞 |
 | `{{TOOL_NAME}}` | 工具名 | `Claude Code` |
 
 模板中还有以下子对象占位符, 从项目画像的子字段填充:

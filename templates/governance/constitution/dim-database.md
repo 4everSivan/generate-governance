@@ -1,5 +1,5 @@
 <!-- source: template/dim-database -->
-### 3.X 数据库安全红线
+### 3.{{DIM_INDEX}} 数据库安全红线
 
 - **[红线] 禁止无备份 DDL**: 未确认有效备份和回滚路径前, 不得执行不可逆 DDL (DROP, TRUNCATE, ALTER 删列等).
 - **[红线] 禁止破坏复制与恢复资产**: 禁止随意删除 WAL, 归档, 备份集, replication slot 或恢复所需元数据.
