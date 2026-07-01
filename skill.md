@@ -273,6 +273,7 @@ API 维度影响优先级:
 | `{{DB_TYPE}}` | profile.deps_summary.categorized.db_driver | 数据库类型 |
 | `{{HAS_DOCKERFILE}}` | profile (部署检测) | 是否有 Dockerfile |
 | `{{HAS_K8S}}` | profile (部署检测) | 是否有 K8s 配置 |
+| `{{HAS_TERRAFORM}}` | profile (部署检测) | 是否有 Terraform 配置 |
 | `{{CI_PIPELINE}}` | profile (配置检测) | CI/CD 描述 |
 | `{{LOG_LOCATIONS}}` | profile (运维检测) | 日志位置 |
 | `{{MONITORING_TOOLS}}` | profile (运维检测) | 监控工具 |
