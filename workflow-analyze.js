@@ -2,7 +2,7 @@ export const meta = {
   name: 'governance-analyze',
   description: 'Analyze a project codebase and produce a structured project profile for governance document generation',
   phases: [
-    { title: 'Analyze', detail: 'Four parallel agents: code structure, dependencies, config, security' },
+    { title: 'Analyze', detail: 'Five parallel agents: code structure, dependencies, config, security, API' },
     { title: 'Summarize', detail: 'Merge results into project profile' },
   ],
 }
@@ -102,6 +102,45 @@ const SECURITY_SCHEMA = {
   required: ['auth_mechanism'],
 }
 
+const API_SCHEMA = {
+  type: 'object',
+  properties: {
+    has_api: { type: 'boolean', description: 'Whether API surface evidence was detected' },
+    frameworks: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'API/web/RPC frameworks detected (Express, FastAPI, Gin, Spring Web, Axum, etc.)',
+    },
+    route_paths: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Route, controller, handler, endpoint, or API directories/files',
+    },
+    schema_files: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'OpenAPI, Swagger, GraphQL, protobuf, or other API contract files',
+    },
+    auth_entrypoints: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Authentication or authorization middleware/entrypoint files for API requests',
+    },
+    test_paths: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'API, integration, e2e, contract, or handler test paths',
+    },
+    evidence: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Short evidence statements supporting API dimension detection',
+    },
+    confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+  },
+  required: ['has_api', 'frameworks', 'route_paths', 'schema_files', 'auth_entrypoints', 'test_paths', 'confidence'],
+}
+
 // --- Agent prompts ---
 
 const CODE_STRUCTURE_PROMPT = `Analyze the codebase at "${args.targetPath}". Your task:
@@ -139,15 +178,26 @@ const SECURITY_PROMPT = `Analyze security patterns at "${args.targetPath}". Your
 
 Be conservative: if you can't find evidence, say "none detected" or "not observable from code."`
 
+const API_PROMPT = `Analyze API surface evidence at "${args.targetPath}". Your task:
+1. Identify whether the project exposes or implements API endpoints (REST, GraphQL, gRPC, RPC, WebSocket, BFF, API routes).
+2. Look for route/controller/handler directories and files: routes, controllers, handlers, api, endpoints, app/api, pages/api, server/routes, etc.
+3. Look for contract/schema files: openapi.yaml, openapi.yml, swagger.json, schema.graphql, *.proto, asyncapi.yaml.
+4. Identify API frameworks and libraries: Express, Fastify, NestJS, Next.js API routes, Gin, Echo, Fiber, FastAPI, Django REST Framework, Flask, Spring Web, Actix Web, Axum, grpc-gateway, GraphQL libraries.
+5. Identify auth/authorization entrypoints that protect API requests.
+6. Identify API-related tests: integration, e2e, contract, handler, controller, request/response tests.
+
+Be conservative: SDK client code, generated API clients, or a directory merely named "api" are not enough by themselves for HIGH confidence. Report evidence and confidence so the user can confirm the api governance dimension.`
+
 // --- Phase execution ---
 
 phase('Analyze')
 
-const [codeResult, depResult, configResult, securityResult] = await parallel([
+const [codeResult, depResult, configResult, securityResult, apiResult] = await parallel([
   () => agent(CODE_STRUCTURE_PROMPT, { label: 'code-structure', schema: CODE_STRUCTURE_SCHEMA }),
   () => agent(DEPENDENCY_PROMPT, { label: 'dependencies', schema: DEPENDENCY_SCHEMA }),
   () => agent(CONFIG_PROMPT, { label: 'config', schema: CONFIG_SCHEMA }),
   () => agent(SECURITY_PROMPT, { label: 'security', schema: SECURITY_SCHEMA }),
+  () => agent(API_PROMPT, { label: 'api', schema: API_SCHEMA }),
 ])
 
 phase('Summarize')
@@ -167,7 +217,7 @@ const SUMMARIZE_SCHEMA = {
     },
     dimensions: {
       type: 'array',
-      items: { type: 'string', enum: ['code', 'database', 'maintenance', 'deploy'] },
+      items: { type: 'string', enum: ['code', 'database', 'maintenance', 'deploy', 'api'] },
       description: 'Applicable governance dimensions. code is always included.',
     },
     scope: { type: 'string', description: 'Scope description: key technologies and products covered' },
@@ -187,6 +237,19 @@ const SUMMARIZE_SCHEMA = {
       type: 'object',
       description: 'Security findings summary',
     },
+    api_summary: {
+      type: 'object',
+      properties: {
+        frameworks: { type: 'array', items: { type: 'string' } },
+        route_paths: { type: 'array', items: { type: 'string' } },
+        schema_files: { type: 'array', items: { type: 'string' } },
+        auth_entrypoints: { type: 'array', items: { type: 'string' } },
+        test_paths: { type: 'array', items: { type: 'string' } },
+        evidence: { type: 'array', items: { type: 'string' } },
+        confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+      },
+      description: 'API surface evidence and governance-relevant facts',
+    },
     confidence: {
       type: 'object',
       properties: {
@@ -194,34 +257,38 @@ const SUMMARIZE_SCHEMA = {
         framework: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
         arch_pattern: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
         dimensions: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
+        api: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
       },
     },
   },
   required: ['project_name', 'language', 'framework', 'domain', 'role', 'priorities', 'dimensions', 'scope'],
 }
 
-const SUMMARIZE_PROMPT = `Synthesize a project profile from these four analysis results. The profile will drive governance document generation.
+const SUMMARIZE_PROMPT = `Synthesize a project profile from these five analysis results. The profile will drive governance document generation.
 
 Analysis results:
 - Code Structure: ${JSON.stringify(codeResult)}
 - Dependencies: ${JSON.stringify(depResult)}
 - Config: ${JSON.stringify(configResult)}
 - Security: ${JSON.stringify(securityResult)}
+- API: ${JSON.stringify(apiResult)}
 
 Instructions:
 1. **project_name**: Use the directory name, or the name field from the package manifest.
 2. **language / framework**: From code structure analysis.
 3. **domain**: Describe the project's domain in Chinese. Be specific — "电商后端服务" is better than "后端服务".
 4. **role**: Construct the expert role in Chinese. Pattern: "精通 {language} 的 {domain_specialist}". For Go backend → "精通 Go 的后端架构师". For Python data → "精通 Python 的数据工程师". Add DB expertise if dim-database applies.
-5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. For non-DB projects, start with 服务可用性.
+5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. If api applies with database, use 数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度. If api applies without database, start with API 安全与契约兼容. For non-DB, non-API projects, start with 服务可用性.
 6. **dimensions**: Determine which governance dimensions apply:
    - code: ALWAYS
    - database: if db_driver deps are present OR migration scripts found
    - deploy: if Dockerfile, k8s, Terraform, or CI deploy steps found
    - maintenance: if monitoring config or alert rules found
-7. **scope**: List the key technologies (language, framework, key deps, deploy tech) as a comma-separated list.
-8. **deps/scripts/dirs/security summaries**: Condense from the analysis results — what matters for governance.
-9. **confidence**: Assess confidence in each key determination.`
+   - api: if API route/controller/schema/framework/test evidence is present; mark LOW confidence for SDK-client-only or ambiguous "api" directories so the user can confirm
+7. **api_summary**: Condense API evidence from apiResult. Include frameworks, route_paths, schema_files, auth_entrypoints, test_paths, evidence, and confidence.
+8. **scope**: List the key technologies (language, framework, key deps, deploy tech, API frameworks) as a comma-separated list.
+9. **deps/scripts/dirs/security/api summaries**: Condense from the analysis results — what matters for governance.
+10. **confidence**: Assess confidence in each key determination.`
 
 const profile = await agent(SUMMARIZE_PROMPT, { label: 'summarize', schema: SUMMARIZE_SCHEMA })
 

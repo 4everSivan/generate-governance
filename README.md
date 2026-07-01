@@ -41,6 +41,7 @@
 - 解析依赖并识别数据库、消息队列、缓存、HTTP、认证、日志和测试相关组件。
 - 检测 Docker, Kubernetes, Terraform, CI/CD, lint, format 和测试脚本等工程配置。
 - 检查认证、权限、敏感数据处理和输入校验等安全线索。
+- 检测 API 框架、路由、契约文件、认证入口和 API 测试线索, 并在用户确认后启用 API 治理维度。
 - 按命中的治理维度选择模板, 并收集用户自定义红线。
 - 支持条件生成 MCP / skills 规则, 包括 Semble, TokenSave, Headroom, Context7, Fetch 以及部分文档和架构类 skills。
 - 生成前扫描目标项目已有治理文档和工具入口, 支持按文件选择合并、覆盖或跳过。
@@ -59,12 +60,12 @@
 ## 工作流
 
 ```
-项目代码 → 并行分析 (4 Agents) → 项目画像 → 现有文档扫描 → 维度确认 → 环境能力确认 → 维度红线收集 → 模板填充 → 输出三件套
+项目代码 → 并行分析 (5 Agents) → 项目画像 → 现有文档扫描 → 维度确认 → 环境能力确认 → 维度红线收集 → 模板填充 → 输出三件套
 ```
 
 ### Phase 1: 并行分析
 
-通过 `workflow-analyze.js` 启动 4 个并行 Agent：
+通过 `workflow-analyze.js` 启动 5 个并行 Agent：
 
 | Agent | 分析内容 |
 |-------|---------|
@@ -72,6 +73,7 @@
 | dependencies | 依赖解析与分类 (db_driver, mq, cache, http, auth…) |
 | config | 构建/运行脚本、CI/CD 管线、部署描述符 (Dockerfile, K8s, Terraform) |
 | security | 认证机制、敏感数据处理、权限模型、输入校验 |
+| api | API 框架、路由、契约文件、认证入口和 API 测试线索 |
 
 ### Phase 2-5: 交互确认
 
@@ -103,6 +105,7 @@ templates/governance/
 │   ├── base.md            # 通用基线
 │   ├── dim-code.md        # 代码质量维度
 │   ├── dim-database.md    # 数据库维度
+│   ├── dim-api.md         # API 维度
 │   ├── dim-deploy.md      # 部署维度
 │   └── dim-maintenance.md # 运维维度
 ├── agents/                # AGENTS.md 模板
@@ -128,8 +131,29 @@ templates/governance/
 |------|---------|---------|
 | **code** (始终命中) | 任意项目 | 禁止跳过 review 合并、覆盖率 ≥80% |
 | **database** | 检测到 DB 驱动或迁移脚本 | 禁止无备份 DDL、禁止生产 DROP TABLE |
+| **api** | 检测到 API 框架、路由、契约文件或 API 测试线索 | 禁止未审计公开 API、禁止响应泄露敏感字段 |
 | **deploy** | 检测到 Docker/K8s/Terraform/CI | 禁止绕过 CI 部署、金丝雀发布强制等待 |
 | **maintenance** | 检测到监控/告警配置 | 禁止无告警变更、变更窗口限制 |
+
+## API 治理维度
+
+`api` 维度面向生产 API 安全与契约兼容, 不是普通接口风格指南。已有代码项目会自动检测 API 证据, 但生成前仍需要用户确认是否启用该维度。
+
+检测信号包括:
+
+- API 框架: Express, Fastify, NestJS, Next.js API routes, Gin, Echo, Fiber, FastAPI, Django REST Framework, Flask, Spring Web, Actix Web, Axum.
+- 路由结构: `routes/`, `controllers/`, `handlers/`, `api/`, `endpoints/`, `app/api/`, `pages/api/`.
+- 契约文件: `openapi.yaml`, `openapi.yml`, `swagger.json`, `schema.graphql`, `*.proto`, `asyncapi.yaml`.
+- 测试线索: API, integration, e2e, contract, handler, controller tests.
+- 网关或生成工具: Kong, Envoy, grpc-gateway, OpenAPI generator.
+
+治理重点:
+
+- 未确认认证、匿名访问和权限边界前, 不新增或放宽公开 API.
+- API 响应不泄露敏感字段、token、内部错误栈、连接信息或实现细节.
+- 破坏性 API 变更需要版本策略、迁移说明、兼容层或用户确认的 breaking-change 方案.
+- 非幂等写接口需要幂等键、事务保护或重复提交防护.
+- 已知 API 契约与实现不一致且影响安全或兼容性时, 不发布.
 
 ## 语言编码规范
 

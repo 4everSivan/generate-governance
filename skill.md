@@ -91,8 +91,8 @@ CODEX.md: overwrite
 将项目画像呈现给用户确认:
 
 - 语言、框架、构建系统
-- 检测到的数据库/部署/监控特征
-- 命中的维度 (code 总是命中; database/deploy/maintenance 条件命中)
+- 检测到的数据库/API/部署/监控特征
+- 命中的维度 (code 总是命中; database/api/deploy/maintenance 条件命中)
 - 目标工具入口
 
 使用 AskUserQuestion 提问:
@@ -182,6 +182,7 @@ multiSelect: false
 | 维度 | 维度名 | 示例红线 |
 |------|--------|---------|
 | dim-database | 数据库 | 禁止无备份 DDL; 禁止生产环境 DROP TABLE |
+| dim-api | API | 禁止未审计公开 API; 禁止响应泄露敏感字段 |
 | dim-deploy | 部署 | 禁止绕过 CI 部署生产; 金丝雀发布强制等待 5 分钟 |
 | dim-maintenance | 运维 | 禁止无告警变更; 变更窗口 02:00-06:00 |
 | dim-code | 代码质量 | 禁止跳过 review 合并主干; 覆盖率不得低于 80% |
@@ -214,6 +215,24 @@ multiSelect: false
 
 若项目已有更具体的语言规范文档或 formatter/linter 配置, 语言模板只能作为补充, 不得覆盖项目现有规范.
 
+API 维度在已有代码项目中自动检测, 但必须由用户确认后启用:
+
+| 证据类型 | 示例 |
+|----------|------|
+| API 框架 | Express, Fastify, NestJS, Next.js API routes, Gin, Echo, Fiber, FastAPI, Django REST Framework, Flask, Spring Web, Actix Web, Axum |
+| 路由结构 | `routes/`, `controllers/`, `handlers/`, `api/`, `endpoints/`, `app/api/`, `pages/api/` |
+| 契约文件 | `openapi.yaml`, `openapi.yml`, `swagger.json`, `schema.graphql`, `*.proto`, `asyncapi.yaml` |
+| 测试线索 | API, integration, e2e, contract, handler, controller tests |
+| 网关/生成工具 | Kong, Envoy, grpc-gateway, OpenAPI generator |
+
+若仅检测到 SDK client 或含义不明的 `api/` 目录, `api` 维度必须标记为 LOW confidence 并等待用户确认.
+
+API 维度影响优先级:
+
+- 同时命中 database 和 api: `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`
+- 命中 api 但未命中 database: `API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`
+- 内部 API 且无敏感数据: `接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度`
+
 ### 6.2 模板填充
 
 将以下变量替换到模板占位符中:
@@ -230,6 +249,7 @@ multiSelect: false
 | `{{#dim-database}}...{{/dim-database}}` | 条件 block: 维度命中时展开内容 |
 | `{{#has_db}}...{{/has_db}}` | 条件 inline: 维度命中时展开 |
 | `{{USER_REDLINES_DATABASE}}` | 用户输入 | 用户输入的逐条红线 |
+| `{{USER_REDLINES_API}}` | 用户输入 | 用户输入的 API 维度逐条红线 |
 | `{{TOOL_NAME}}` | 工具名 | `Claude Code` |
 
 模板中还有以下子对象占位符, 从项目画像的子字段填充:
@@ -256,15 +276,23 @@ multiSelect: false
 | `{{LOG_LOCATIONS}}` | profile (运维检测) | 日志位置 |
 | `{{MONITORING_TOOLS}}` | profile (运维检测) | 监控工具 |
 | `{{ALERT_CONFIGS}}` | profile (运维检测) | 告警配置 |
+| `{{API_FRAMEWORKS}}` | profile.api_summary.frameworks | API 框架 |
+| `{{API_ROUTE_PATHS}}` | profile.api_summary.route_paths | 路由/控制器/Handler 路径 |
+| `{{API_SCHEMA_FILES}}` | profile.api_summary.schema_files | OpenAPI/Swagger/GraphQL/proto 契约文件 |
+| `{{API_AUTH_ENTRYPOINTS}}` | profile.api_summary.auth_entrypoints | 认证/授权入口 |
+| `{{API_TEST_PATHS}}` | profile.api_summary.test_paths | API/integration/e2e/contract 测试路径 |
+| `{{API_CONFIDENCE}}` | profile.api_summary.confidence | API 维度检测置信度 |
 | `{{SKILLS_INDEX}}` | profile (skills 扫描) | 技能索引列表 |
 | `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills 能力摘要 |
 | `{{LANGUAGE_CODE_STANDARDS}}` | profile.language + code-standards 模板 | 语言专属编码规范, 未命中时使用 generic |
 
 **条件 block 语法:**
 - `{{#dim-database}}...{{/dim-database}}` — 命中 database 维度时展开 block 内容
+- `{{#dim-api}}...{{/dim-api}}` — 命中 api 维度时展开 block 内容
 - `{{#dim-deploy}}...{{/dim-deploy}}` — 命中 deploy 维度时展开 block 内容
 - `{{#dim-maintenance}}...{{/dim-maintenance}}` — 命中 maintenance 维度时展开 block 内容
 - `{{#has_db}}...{{/has_db}}` — 命中 database 维度时展开 inline 内容 (用于角色描述中的子句)
+- `{{#has_api}}...{{/has_api}}` — 命中 api 维度时展开 inline 内容
 - `{{#has_deploy}}...{{/has_deploy}}` — 命中 deploy 维度时展开 inline 内容
 - `{{#has_maintenance}}...{{/has_maintenance}}` — 命中 maintenance 维度时展开 inline 内容
 - `{{#has_mcp_semble}}...{{/has_mcp_semble}}` — 检测到并经用户确认 `semble` 时展开
@@ -315,7 +343,7 @@ multiSelect: false
 ```
 治理文档生成完成:
 
-✅ constitution.md — 4 个维度, 12 条红线
+✅ constitution.md — 已确认维度与红线
 ✅ AGENTS.md — 项目事实层, 8 个章节
 ✅ CLAUDE.md — Claude Code 工具入口
 
@@ -335,6 +363,8 @@ multiSelect: false
 | Workflow 部分 agent 失败 | 标注该维度数据盲区, 其余正常 |
 | 多个工具入口同时存在 | 提示用户选择本次生成/更新的工具入口 |
 | 已有治理文档但用户未确认处理策略 | 停止写入该文件, 询问合并/覆盖/跳过 |
+| API 检测证据较弱 | 标记 LOW confidence, 在维度确认阶段让用户决定是否启用 api |
+| API 模板缺失 | 跳过 api 维度并报告缺失模板, 不生成半截 API 红线 |
 | 能力检测失败 | 不生成特定 MCP/skill 强制规则, 仅生成通用降级规则 |
 | 用户跳过能力确认 | 不写入特定 MCP/skill 规则 |
 | 模板文件缺失 | 降级到 skill 内置 fallback 模板 |
@@ -348,6 +378,7 @@ multiSelect: false
 - [ ] 已扫描现有治理文档和工具入口
 - [ ] 已确认已有文件的合并/覆盖/跳过策略
 - [ ] 维度判定正确
+- [ ] API 维度证据已展示并由用户确认
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则
 - [ ] 用户确认的 MCP/skills 条件 block 正确展开
 - [ ] 四轮交互完成
