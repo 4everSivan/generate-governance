@@ -245,11 +245,15 @@ API 维度影响优先级:
 | `{{SCOPE}}` | 项目画像 | `Go, Gin, PostgreSQL, Kubernetes` |
 | `{{DOMAIN}}` | 项目画像推断 | `后端服务` |
 | `{{ROLE}}` | 项目画像推断 | `精通 Go 的架构师` |
-| `{{PRIORITIES}}` | 项目画像 + 维度 | `数据安全 > 服务可用性 > 可恢复性 > 证据可信度` |
+| `{{PRIORITIES}}` | 项目画像 + 维度 | `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度` (命中 api+database 时) |
 | `{{#dim-database}}...{{/dim-database}}` | 条件 block: 维度命中时展开内容 |
 | `{{#has_db}}...{{/has_db}}` | 条件 inline: 维度命中时展开 |
 | `{{USER_REDLINES_DATABASE}}` | 用户输入 | 用户输入的逐条红线 |
 | `{{USER_REDLINES_API}}` | 用户输入 | 用户输入的 API 维度逐条红线 |
+| `{{USER_REDLINES_CODE}}` | 用户输入 | 用户输入的代码维度逐条红线 |
+| `{{USER_REDLINES_DEPLOY}}` | 用户输入 | 用户输入的部署维度逐条红线 |
+| `{{USER_REDLINES_MAINTENANCE}}` | 用户输入 | 用户输入的运维维度逐条红线 |
+| `{{DIM_INDEX}}` | 维度顺序 | 维度段章节号; base.md 固定 3.1-3.4, 维度段从 3.5 起: code 总是 3.5, 其后 database/api/deploy/maintenance 按命中顺序递增 3.6/3.7/..., 未命中不插入, 编号连续无空洞 |
 | `{{TOOL_NAME}}` | 工具名 | `Claude Code` |
 
 模板中还有以下子对象占位符, 从项目画像的子字段填充:
@@ -272,6 +276,7 @@ API 维度影响优先级:
 | `{{DB_TYPE}}` | profile.deps_summary.categorized.db_driver | 数据库类型 |
 | `{{HAS_DOCKERFILE}}` | profile (部署检测) | 是否有 Dockerfile |
 | `{{HAS_K8S}}` | profile (部署检测) | 是否有 K8s 配置 |
+| `{{HAS_TERRAFORM}}` | profile (部署检测) | 是否有 Terraform 配置 |
 | `{{CI_PIPELINE}}` | profile (配置检测) | CI/CD 描述 |
 | `{{LOG_LOCATIONS}}` | profile (运维检测) | 日志位置 |
 | `{{MONITORING_TOOLS}}` | profile (运维检测) | 监控工具 |

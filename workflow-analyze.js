@@ -257,11 +257,11 @@ const SUMMARIZE_SCHEMA = {
         framework: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
         arch_pattern: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
         dimensions: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
-        api: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
+        api: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
       },
     },
   },
-  required: ['project_name', 'language', 'framework', 'domain', 'role', 'priorities', 'dimensions', 'scope'],
+  required: ['project_name', 'language', 'framework', 'domain', 'role', 'priorities', 'dimensions', 'scope', 'api_summary'],
 }
 
 const SUMMARIZE_PROMPT = `Synthesize a project profile from these five analysis results. The profile will drive governance document generation.
@@ -278,7 +278,7 @@ Instructions:
 2. **language / framework**: From code structure analysis.
 3. **domain**: Describe the project's domain in Chinese. Be specific — "电商后端服务" is better than "后端服务".
 4. **role**: Construct the expert role in Chinese. Pattern: "精通 {language} 的 {domain_specialist}". For Go backend → "精通 Go 的后端架构师". For Python data → "精通 Python 的数据工程师". Add DB expertise if dim-database applies.
-5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. If api applies with database, use 数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度. If api applies without database, start with API 安全与契约兼容. For non-DB, non-API projects, start with 服务可用性.
+5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. If api applies with database, use 数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度. If api applies without database, start with API 安全与契约兼容. If api applies with no sensitive data exposure (internal API: auth_entrypoints empty AND security_summary shows no sensitive data fields), start with 接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度. For non-DB, non-API projects, start with 服务可用性.
 6. **dimensions**: Determine which governance dimensions apply:
    - code: ALWAYS
    - database: if db_driver deps are present OR migration scripts found
