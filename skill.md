@@ -245,7 +245,7 @@ API 维度影响优先级:
 | `{{SCOPE}}` | 项目画像 | `Go, Gin, PostgreSQL, Kubernetes` |
 | `{{DOMAIN}}` | 项目画像推断 | `后端服务` |
 | `{{ROLE}}` | 项目画像推断 | `精通 Go 的架构师` |
-| `{{PRIORITIES}}` | 项目画像 + 维度 | `数据安全 > 服务可用性 > 可恢复性 > 证据可信度` |
+| `{{PRIORITIES}}` | 项目画像 + 维度 | `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度` (命中 api+database 时) |
 | `{{#dim-database}}...{{/dim-database}}` | 条件 block: 维度命中时展开内容 |
 | `{{#has_db}}...{{/has_db}}` | 条件 inline: 维度命中时展开 |
 | `{{USER_REDLINES_DATABASE}}` | 用户输入 | 用户输入的逐条红线 |
