@@ -64,7 +64,65 @@ options:
 
 若用户选择 "修改维度", 通过文本收集修正信息, 更新维度列表.
 
-## Phase 3: 第二轮交互 — 领域红线收集
+## Phase 3: 第二轮交互 — 环境能力检测与确认
+
+检测当前 agent 环境中可用的 MCP 服务与 skills, 仅将**检测到且用户确认启用**的能力写入生成文档.
+
+### 3.1 能力检测
+
+检测候选 MCP 服务:
+
+| 能力 | 规则用途 |
+|------|----------|
+| `semble` | 代码搜索优先级, 语义检索, find-related |
+| `tokensave` | 代码图探索, 依赖分析, 长期决策记录 |
+| `headroom` | 上下文压缩, 原文 hash 追溯, 压缩统计 |
+| `context7` | 第三方库/API/CLI/云服务文档查询 |
+| `fetch` | 外部 URL 与官方资料获取 |
+
+检测候选 skills:
+
+| 能力 | 规则用途 |
+|------|----------|
+| `improve-codebase-architecture` | 架构改进, 解耦, 可测试性分析 |
+| `brainstorming` | 复杂或创造性变更前收敛设计 |
+| `documents` / `pdf` / `spreadsheets` / `presentations` | 文档, PDF, 表格, 演示文稿生成与视觉验证 |
+| `pua` | 失败多次后的强制换路与穷尽方案, 仅用户明确确认时写入 |
+
+检测结果必须区分:
+
+- `available`: 当前环境检测到.
+- `confirmed`: 用户确认写入生成规范.
+- `skipped`: 未检测到或用户选择不写入.
+
+### 3.2 用户确认
+
+将能力检测结果呈现给用户:
+
+- 检测到的 MCP 服务.
+- 检测到的 skills.
+- 每项能力将生成的规则摘要.
+- 未检测到的候选能力不生成对应强制规则.
+
+使用 AskUserQuestion 提问:
+
+```
+header: "能力确认"
+question: "是否将检测到的 MCP / skills 能力写入项目治理规范?"
+options:
+  - label: "确认全部"
+    description: "将检测到的候选能力全部写入"
+  - label: "选择部分"
+    description: "我指定哪些能力写入"
+  - label: "全部跳过"
+    description: "不生成环境能力规则"
+```
+
+若用户选择 "选择部分", 通过文本收集确认列表, 更新 `confirmed_capabilities`.
+
+**红线:** 不得把当前环境未检测到的 MCP/skill 写成项目强制规则; 不得在用户未确认时写入特定 MCP/skill 依赖.
+
+## Phase 4: 第三轮交互 — 领域红线收集
 
 对每个命中维度, 使用 AskUserQuestion 收集用户特定红线:
 
@@ -85,9 +143,9 @@ multiSelect: false
 
 通用基线红线 (不伪造事实, 基于证据表达, 最小权限等) 自动填充, 不询问.
 
-## Phase 4: 模板填充与生成
+## Phase 5: 模板填充与生成
 
-### 4.1 模板选择
+### 5.1 模板选择
 
 根据命中的维度, 读取对应模板文件:
 
@@ -97,7 +155,7 @@ multiSelect: false
 
 模板路径: 优先查找项目 `templates/governance/`, 其次 skill 内置 `templates/governance/`.
 
-### 4.2 模板填充
+### 5.2 模板填充
 
 将以下变量替换到模板占位符中:
 
@@ -140,6 +198,7 @@ multiSelect: false
 | `{{MONITORING_TOOLS}}` | profile (运维检测) | 监控工具 |
 | `{{ALERT_CONFIGS}}` | profile (运维检测) | 告警配置 |
 | `{{SKILLS_INDEX}}` | profile (skills 扫描) | 技能索引列表 |
+| `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills 能力摘要 |
 
 **条件 block 语法:**
 - `{{#dim-database}}...{{/dim-database}}` — 命中 database 维度时展开 block 内容
@@ -148,10 +207,19 @@ multiSelect: false
 - `{{#has_db}}...{{/has_db}}` — 命中 database 维度时展开 inline 内容 (用于角色描述中的子句)
 - `{{#has_deploy}}...{{/has_deploy}}` — 命中 deploy 维度时展开 inline 内容
 - `{{#has_maintenance}}...{{/has_maintenance}}` — 命中 maintenance 维度时展开 inline 内容
+- `{{#has_mcp_semble}}...{{/has_mcp_semble}}` — 检测到并经用户确认 `semble` 时展开
+- `{{#has_mcp_tokensave}}...{{/has_mcp_tokensave}}` — 检测到并经用户确认 `tokensave` 时展开
+- `{{#has_mcp_headroom}}...{{/has_mcp_headroom}}` — 检测到并经用户确认 `headroom` 时展开
+- `{{#has_mcp_context7}}...{{/has_mcp_context7}}` — 检测到并经用户确认 `context7` 时展开
+- `{{#has_mcp_fetch}}...{{/has_mcp_fetch}}` — 检测到并经用户确认 `fetch` 时展开
+- `{{#has_skill_architecture}}...{{/has_skill_architecture}}` — 检测到并经用户确认架构改进 skill 时展开
+- `{{#has_skill_brainstorming}}...{{/has_skill_brainstorming}}` — 检测到并经用户确认 brainstorming skill 时展开
+- `{{#has_skill_artifacts}}...{{/has_skill_artifacts}}` — 检测到并经用户确认文档/表格/演示/PDF 类 skill 时展开
+- `{{#has_skill_pua}}...{{/has_skill_pua}}` — 检测到并经用户明确确认 `pua` skill 时展开
 
-维度 block 展开逻辑: 命中维度时保留 block 内容并去掉 `{{#dim-*}}` / `{{/dim-*}}` 标签; 未命中时整块删除. 条件 inline (`{{#has_*}}`) 同理.
+维度 block 展开逻辑: 命中维度时保留 block 内容并去掉 `{{#dim-*}}` / `{{/dim-*}}` 标签; 未命中时整块删除. 能力 block 只有在 `available && confirmed` 同时成立时展开. 条件 inline (`{{#has_*}}`) 同理.
 
-### 4.3 写入输出文件
+### 5.3 写入输出文件
 
 将填充后的内容写入 target-path 下的三个文件:
 
@@ -167,7 +235,7 @@ multiSelect: false
 3. 合并模式: 保留旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新
 4. 跳过: 不写入
 
-### 4.4 来源标注
+### 5.4 来源标注
 
 每个生成文件的 section 末尾添加 HTML 注释标注填充来源:
 
@@ -176,9 +244,10 @@ multiSelect: false
 <!-- source: scan/code-structure, confidence: HIGH -->
 <!-- source: infer, confidence: MEDIUM -->
 <!-- source: user-input -->
+<!-- source: capability-detect, confirmed: true -->
 ```
 
-## Phase 5: 完成摘要
+## Phase 6: 完成摘要
 
 展示生成结果:
 
@@ -203,6 +272,8 @@ multiSelect: false
 | target-path 为空 | 默认 `.` |
 | 目标路径无项目特征 | 提示, 询问是否继续最小生成 (仅 base 模板, 无维度叠加) |
 | Workflow 部分 agent 失败 | 标注该维度数据盲区, 其余正常 |
+| 能力检测失败 | 不生成特定 MCP/skill 强制规则, 仅生成通用降级规则 |
+| 用户跳过能力确认 | 不写入特定 MCP/skill 规则 |
 | 模板文件缺失 | 降级到 skill 内置 fallback 模板 |
 | 用户中断交互 | 保留分析结果, 下次可续接 |
 
@@ -211,7 +282,9 @@ multiSelect: false
 - [ ] 参数解析正确 (target-path, --tool)
 - [ ] Workflow 返回有效项目画像
 - [ ] 维度判定正确
-- [ ] 两轮交互完成
+- [ ] 能力检测完成, 未检测到的能力未写入强制规则
+- [ ] 用户确认的 MCP/skills 条件 block 正确展开
+- [ ] 三轮交互完成
 - [ ] 模板选择正确
 - [ ] 占位符全部填充, 无残留 `{{ }}`
 - [ ] 维度 block 正确展开/删除

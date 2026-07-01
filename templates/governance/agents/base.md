@@ -79,4 +79,93 @@
 ## 7. 服务与拓扑
 
 {{TOPOLOGY_SECTION}}
+
+---
+
+## 8. 已确认环境能力
+
+以下规则仅在生成时检测到对应 MCP/skill 且经用户确认后出现. 未出现的能力不得被视为项目强制依赖.
+
+{{CAPABILITIES_SUMMARY}}
+
+{{#has_mcp_semble}}
+### Semble 代码搜索
+
+- **[强制] 代码探索先用 Semble**: 需要理解代码结构, 定位实现, 查找调用关系时, 先使用 Semble 语义搜索, 再按返回路径读取文件.
+- **[强制] 避免重复搜索**: Semble 已返回明确文件和行号时, 不对同一语义问题重复使用 grep/rg.
+- **[默认] Grep/rg 边界**: 仅用于精确字符串, 全仓库字面匹配, 确认符号残留, 或 Semble 结果上下文不足时.
+- **[默认] 相关实现发现**: 已定位关键实现后, 优先使用 Semble find-related 查相似实现, 调用方或测试.
+<!-- source: capability-detect/mcp-semble, confirmed: true -->
+{{/has_mcp_semble}}
+
+{{#has_mcp_tokensave}}
+### TokenSave 代码图
+
+- **[默认] 代码图优先**: 需要理解模块关系, 符号关系, 架构调用链或依赖分布时, 优先使用 TokenSave 的代码图能力.
+- **[默认] 分工**: Semble 用于快速定位文件和代码块; TokenSave 用于理解跨文件关系, 依赖图和长期上下文.
+- **[强制] 汇报节省信息**: TokenSave 返回 `tokensave_metrics` 时, 必须向用户报告节省量.
+- **[强制] 持久化克制**: 只有用户确认的长期架构决策, 约束或偏好才可记录; 不得记录敏感凭据或未经验证的推断.
+<!-- source: capability-detect/mcp-tokensave, confirmed: true -->
+{{/has_mcp_tokensave}}
+
+{{#has_mcp_headroom}}
+### Headroom 上下文管理
+
+- **[强制] 大内容先压缩**: 大型日志, 搜索结果, 长文件内容或大 diff 进入推理前, 优先使用 Headroom 压缩.
+- **[强制] 压缩摘要保真**: 摘要必须保留用户最新目标, 已确认约束, 已改文件, 未完成事项, 验证结果, 关键决策和阻塞点.
+- **[强制] 可追溯**: 压缩结果带 hash 时, 后续需要细节必须 retrieve 原文; 不得凭摘要补造细节.
+- **[红线] 摘要不替代证据**: 压缩摘要只能辅助推理, 不能替代原始日志, 测试输出或源码证据.
+<!-- source: capability-detect/mcp-headroom, confirmed: true -->
+{{/has_mcp_headroom}}
+
+{{#has_mcp_context7}}
+### Context7 文档查询
+
+- **[强制] 第三方 API 先查文档**: 涉及库, 框架, SDK, CLI, 云服务, 版本迁移和配置语法时, 优先使用 Context7.
+- **[强制] 先 resolve 再 query**: 除非用户提供 `/org/project` 形式的 library ID, 否则必须先解析 library ID.
+- **[强制] 标注版本边界**: 文档结论涉及版本差异时, 必须说明适用版本和证据来源.
+- **[默认] 不滥用**: 业务逻辑, 代码审查, 重构建议和通用编程概念不需要 Context7.
+<!-- source: capability-detect/mcp-context7, confirmed: true -->
+{{/has_mcp_context7}}
+
+{{#has_mcp_fetch}}
+### Fetch 外部资料
+
+- **[默认] 官方来源优先**: 外部资料优先官方文档, 规范, 仓库 README 和 release notes.
+- **[强制] 外部资料不替代现场证据**: 网页只能证明机制和文档描述, 不能证明当前项目或生产现场状态.
+- **[强制] 禁止请求敏感 URL**: 不请求包含 token, 私钥, 内部凭据或敏感查询参数的 URL.
+<!-- source: capability-detect/mcp-fetch, confirmed: true -->
+{{/has_mcp_fetch}}
+
+{{#has_skill_architecture}}
+### 架构改进 Skill
+
+- **[默认] 架构问题使用专用 skill**: 用户请求架构改进, 解耦, 降低复杂度或提升可测试性时, 使用架构改进 skill 辅助分析.
+- **[强制] 不扩大范围**: 普通 bugfix 或小修改不得自动扩大为架构改造.
+<!-- source: capability-detect/skill-architecture, confirmed: true -->
+{{/has_skill_architecture}}
+
+{{#has_skill_brainstorming}}
+### Brainstorming Skill
+
+- **[默认] 复杂/创造性变更前使用**: 新功能, 行为设计, 大范围交互变化或不确定需求先使用 brainstorming 收敛目标, 约束和成功标准.
+- **[强制] 小改动不过度流程化**: 明确的小 bugfix, 文案调整, 配置修正和机械性改动不因该 skill 存在而强制进入完整设计流程.
+<!-- source: capability-detect/skill-brainstorming, confirmed: true -->
+{{/has_skill_brainstorming}}
+
+{{#has_skill_artifacts}}
+### 文档与制品 Skills
+
+- **[默认] 专用格式使用专用 skill**: 生成或编辑 Word, PDF, 表格或演示文稿时, 使用对应文档类 skill.
+- **[强制] 视觉制品需验证**: 对布局敏感的文档, PDF, 表格和演示文稿交付前必须渲染或打开检查.
+<!-- source: capability-detect/skill-artifacts, confirmed: true -->
+{{/has_skill_artifacts}}
+
+{{#has_skill_pua}}
+### 失败恢复 Skill
+
+- **[例外] 仅失败恢复时启用**: 同一任务失败多次, 即将放弃, 或用户明确要求换路/穷尽方案时, 才使用失败恢复 skill.
+- **[强制] 不改变项目语气**: 该 skill 只用于执行恢复, 不得污染项目文档, 用户沟通语气或正常协作流程.
+<!-- source: capability-detect/skill-pua, confirmed: true -->
+{{/has_skill_pua}}
 <!-- /source: template/base -->

@@ -23,7 +23,15 @@
 
 ---
 
-## 3. Skill 索引
+## 3. 已确认环境能力
+
+本项目生成时确认的 MCP / skills 能力以 `AGENTS.md` 的"已确认环境能力"为准. 未在 `AGENTS.md` 出现的 MCP/skill 不得被视为项目强制依赖.
+
+{{CAPABILITIES_SUMMARY}}
+
+---
+
+## 4. Skill 索引
 
 {{SKILLS_INDEX}}
 <!-- /source: template/tool-entry/gemini -->
