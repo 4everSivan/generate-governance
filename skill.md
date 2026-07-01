@@ -41,79 +41,54 @@ Workflow({scriptPath: ".agents/skills/generate-governance/workflow-analyze.js", 
 
 4. 获取项目画像 (project profile JSON).
 
-## Phase 2: 第一轮交互 — 现有治理文档扫描
+## Phase 2: 第一轮交互 — 检测结果确认 (现有文档与维度)
 
-在目标项目下扫描已有治理文档与工具入口文件:
+将现有治理文档与项目画像的检测结果**一次性**呈现给用户, 避免分多轮确认. 呈现内容:
 
-| 文件 | 用途 |
-|------|------|
-| `constitution.md` | 治理宪法 |
-| `AGENTS.md` | 项目事实层 |
-| `CLAUDE.md` | Claude Code 工具入口 |
-| `GEMINI.md` | Gemini CLI 工具入口 |
-| `CODEX.md` | Codex 工具入口 |
-| `KIRO.md` | Kiro 工具入口 |
-
-扫描后必须呈现:
-
-- 已存在的治理文档列表.
-- 每个文件是否包含 `<!-- user-custom -->...<!-- /user-custom -->` 可保留区.
-- 工具入口自动检测结果 (检测顺序: `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → 默认 `claude`).
-- 若多个工具入口同时存在, 必须提示用户选择本次要生成/更新的 `{TOOL}.md`, 不得静默覆盖多个入口.
+- **现有治理文档扫描**: 检测 `constitution.md` / `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `CODEX.md` / `KIRO.md` 是否存在, 每个文件是否含 `<!-- user-custom -->...<!-- /user-custom -->` 可保留区, 以及提议的处理策略 (默认: 合并).
+- **工具入口**: 自动检测顺序 `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → 默认 `claude`. 若多个工具入口同时存在, 必须提示用户选择本次生成/更新的 `{TOOL}.md`.
+- **项目画像摘要**: 语言, 框架, 构建系统; 数据库/API/部署/监控特征; 命中维度 (code 总是命中; database/api/deploy/maintenance 条件命中).
+- **关联提示**: 若检测到已有 `constitution.md`, 标注"建议维度与现有 constitution 对齐", 避免用户因信息分批呈现而忽略文档与维度的关联.
 
 使用 AskUserQuestion 提问:
 
 ```
-header: "现有文档"
-question: "检测到已有治理文档或工具入口. 本次如何处理?"
+header: "检测结果确认"
+question: "检测结果与处理策略是否准确? 需要调整吗?"
 options:
-  - label: "合并"
-    description: "保留 user-custom 区块, 更新其余生成内容"
-  - label: "跳过"
-    description: "保留现有文件, 不写入对应文件"
-  - label: "覆盖"
-    description: "备份到 .governance-backup/ 后重写"
+  - label: "全部确认"
+    description: "按提议策略继续 (现有文档合并, 维度按检测结果)"
+  - label: "我要调整"
+    description: "调整文档处理策略或增减维度"
 ```
 
-若不同文件需要不同处理策略, 通过文本收集文件级策略, 例如:
+若用户选择 "我要调整", 通过一次文本收集所有修正, 同时覆盖文档策略与维度:
 
 ```text
+# 文档策略 (merge/overwrite/skip, 未列出的文件按提议默认)
 constitution.md: merge
 AGENTS.md: merge
 CLAUDE.md: skip
 CODEX.md: overwrite
+
+# 维度修正 (增/删维度, 或修正检测结果)
++ api
+- maintenance
 ```
 
-**红线:** 未经用户确认, 不得覆盖或重写目标项目中已存在的 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`.
+更新 `confirmed_dimensions` 与文件级策略映射. 文档策略语义:
 
-## Phase 3: 第二轮交互 — 维度确认
+- **合并**: 保留旧文件 `<!-- user-custom -->...<!-- /user-custom -->` 区块, 更新其余生成内容.
+- **覆盖**: 备份到 `.governance-backup/` 后重写.
+- **跳过**: 保留现有文件, 不写入对应文件.
 
-将项目画像呈现给用户确认:
+**红线:** 未经用户确认, 不得覆盖或重写目标项目中已存在的 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`; 多工具入口不得静默覆盖.
 
-- 语言、框架、构建系统
-- 检测到的数据库/API/部署/监控特征
-- 命中的维度 (code 总是命中; database/api/deploy/maintenance 条件命中)
-- 目标工具入口
-
-使用 AskUserQuestion 提问:
-
-```
-header: "维度确认"
-question: "检测结果是否准确? 需要增减维度吗?"
-options:
-  - label: "确认"
-    description: "按检测结果继续"
-  - label: "修改维度"
-    description: "我要增减维度或修正检测结果"
-```
-
-若用户选择 "修改维度", 通过文本收集修正信息, 更新维度列表.
-
-## Phase 4: 第三轮交互 — 环境能力检测与确认
+## Phase 3: 第二轮交互 — 环境能力检测与确认
 
 检测当前 agent 环境中可用的 MCP 服务与 skills, 仅将**检测到且用户确认启用**的能力写入生成文档.
 
-### 4.1 能力检测
+### 3.1 能力检测
 
 检测候选 MCP 服务:
 
@@ -140,7 +115,7 @@ options:
 - `confirmed`: 用户确认写入生成规范.
 - `skipped`: 未检测到或用户选择不写入.
 
-### 4.2 用户确认
+### 3.2 用户确认
 
 将能力检测结果呈现给用户:
 
@@ -167,7 +142,7 @@ options:
 
 **红线:** 不得把当前环境未检测到的 MCP/skill 写成项目强制规则; 不得在用户未确认时写入特定 MCP/skill 依赖.
 
-## Phase 5: 第四轮交互 — 领域红线收集
+## Phase 4: 第三轮交互 — 领域红线收集
 
 对每个命中维度, 使用 AskUserQuestion 收集用户特定红线:
 
@@ -189,9 +164,9 @@ multiSelect: false
 
 通用基线红线 (不伪造事实, 基于证据表达, 最小权限等) 自动填充, 不询问.
 
-## Phase 6: 模板填充与生成
+## Phase 5: 模板填充与生成
 
-### 6.1 模板选择
+### 5.1 模板选择
 
 根据命中的维度, 读取对应模板文件:
 
@@ -233,7 +208,7 @@ API 维度影响优先级:
 - 命中 api 但未命中 database: `API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`
 - 内部 API 且无敏感数据: `接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度`
 
-### 6.2 模板填充
+### 5.2 模板填充
 
 将以下变量替换到模板占位符中:
 
@@ -312,7 +287,7 @@ API 维度影响优先级:
 
 维度 block 展开逻辑: 命中维度时保留 block 内容并去掉 `{{#dim-*}}` / `{{/dim-*}}` 标签; 未命中时整块删除. 能力 block 只有在 `available && confirmed` 同时成立时展开. 条件 inline (`{{#has_*}}`) 同理.
 
-### 6.3 写入输出文件
+### 5.3 写入输出文件
 
 将填充后的内容写入 target-path 下的三个文件:
 
@@ -329,7 +304,7 @@ API 维度影响优先级:
 4. 跳过: 不写入.
 5. 若 Phase 2 未记录某个已存在文件的处理策略, 必须暂停并再次询问, 不得默认覆盖.
 
-### 6.4 来源标注
+### 5.4 来源标注
 
 每个生成文件的 section 末尾添加 HTML 注释标注填充来源:
 
@@ -341,7 +316,7 @@ API 维度影响优先级:
 <!-- source: capability-detect, confirmed: true -->
 ```
 
-## Phase 7: 完成摘要
+## Phase 6: 完成摘要
 
 展示生成结果:
 
