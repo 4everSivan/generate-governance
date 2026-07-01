@@ -13,6 +13,7 @@
     "workflow-analyze.js",
     "templates",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
