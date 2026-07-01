@@ -6,5 +6,9 @@
 - **[默认] 静态检查**: 提交前应通过 lint, 格式化检查和静态分析.
 - **[默认] 依赖审计**: 引入新依赖前应评估许可证, 安全性和维护状态.
 
+### 3.X 语言专属编码规范
+
+{{LANGUAGE_CODE_STANDARDS}}
+
 {{USER_REDLINES_CODE}}
 <!-- /source: template/dim-code -->

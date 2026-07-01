@@ -41,7 +41,52 @@ Workflow({scriptPath: ".agents/skills/generate-governance/workflow-analyze.js", 
 
 4. 获取项目画像 (project profile JSON).
 
-## Phase 2: 第一轮交互 — 维度确认
+## Phase 2: 第一轮交互 — 现有治理文档扫描
+
+在目标项目下扫描已有治理文档与工具入口文件:
+
+| 文件 | 用途 |
+|------|------|
+| `constitution.md` | 治理宪法 |
+| `AGENTS.md` | 项目事实层 |
+| `CLAUDE.md` | Claude Code 工具入口 |
+| `GEMINI.md` | Gemini CLI 工具入口 |
+| `CODEX.md` | Codex 工具入口 |
+| `KIRO.md` | Kiro 工具入口 |
+
+扫描后必须呈现:
+
+- 已存在的治理文档列表.
+- 每个文件是否包含 `<!-- user-custom -->...<!-- /user-custom -->` 可保留区.
+- 工具入口自动检测结果 (检测顺序: `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → 默认 `claude`).
+- 若多个工具入口同时存在, 必须提示用户选择本次要生成/更新的 `{TOOL}.md`, 不得静默覆盖多个入口.
+
+使用 AskUserQuestion 提问:
+
+```
+header: "现有文档"
+question: "检测到已有治理文档或工具入口. 本次如何处理?"
+options:
+  - label: "合并"
+    description: "保留 user-custom 区块, 更新其余生成内容"
+  - label: "跳过"
+    description: "保留现有文件, 不写入对应文件"
+  - label: "覆盖"
+    description: "备份到 .governance-backup/ 后重写"
+```
+
+若不同文件需要不同处理策略, 通过文本收集文件级策略, 例如:
+
+```text
+constitution.md: merge
+AGENTS.md: merge
+CLAUDE.md: skip
+CODEX.md: overwrite
+```
+
+**红线:** 未经用户确认, 不得覆盖或重写目标项目中已存在的 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`.
+
+## Phase 3: 第二轮交互 — 维度确认
 
 将项目画像呈现给用户确认:
 
@@ -64,11 +109,11 @@ options:
 
 若用户选择 "修改维度", 通过文本收集修正信息, 更新维度列表.
 
-## Phase 3: 第二轮交互 — 环境能力检测与确认
+## Phase 4: 第三轮交互 — 环境能力检测与确认
 
 检测当前 agent 环境中可用的 MCP 服务与 skills, 仅将**检测到且用户确认启用**的能力写入生成文档.
 
-### 3.1 能力检测
+### 4.1 能力检测
 
 检测候选 MCP 服务:
 
@@ -95,7 +140,7 @@ options:
 - `confirmed`: 用户确认写入生成规范.
 - `skipped`: 未检测到或用户选择不写入.
 
-### 3.2 用户确认
+### 4.2 用户确认
 
 将能力检测结果呈现给用户:
 
@@ -122,7 +167,7 @@ options:
 
 **红线:** 不得把当前环境未检测到的 MCP/skill 写成项目强制规则; 不得在用户未确认时写入特定 MCP/skill 依赖.
 
-## Phase 4: 第三轮交互 — 领域红线收集
+## Phase 5: 第四轮交互 — 领域红线收集
 
 对每个命中维度, 使用 AskUserQuestion 收集用户特定红线:
 
@@ -143,19 +188,33 @@ multiSelect: false
 
 通用基线红线 (不伪造事实, 基于证据表达, 最小权限等) 自动填充, 不询问.
 
-## Phase 5: 模板填充与生成
+## Phase 6: 模板填充与生成
 
-### 5.1 模板选择
+### 6.1 模板选择
 
 根据命中的维度, 读取对应模板文件:
 
 - `templates/governance/constitution/base.md` + 每个命中维度的 `dim-{dimension}.md`
 - `templates/governance/agents/base.md` + 每个命中维度的 `dim-{dimension}.md`
 - `templates/governance/tool-entry/{tool}.md`
+- `templates/governance/code-standards/{language}.md` 或 `templates/governance/code-standards/generic.md`
 
 模板路径: 优先查找项目 `templates/governance/`, 其次 skill 内置 `templates/governance/`.
 
-### 5.2 模板填充
+代码维度总是尝试加载语言专属编码规范:
+
+| profile.language | 模板 |
+|------------------|------|
+| `Go` / `Golang` | `code-standards/go.md` |
+| `Python` | `code-standards/python.md` |
+| `TypeScript` / `JavaScript` / `Node.js` | `code-standards/typescript.md` |
+| `Java` / `Kotlin` / `Spring` | `code-standards/java.md` |
+| `Rust` | `code-standards/rust.md` |
+| 其他或低置信度 | `code-standards/generic.md` |
+
+若项目已有更具体的语言规范文档或 formatter/linter 配置, 语言模板只能作为补充, 不得覆盖项目现有规范.
+
+### 6.2 模板填充
 
 将以下变量替换到模板占位符中:
 
@@ -199,6 +258,7 @@ multiSelect: false
 | `{{ALERT_CONFIGS}}` | profile (运维检测) | 告警配置 |
 | `{{SKILLS_INDEX}}` | profile (skills 扫描) | 技能索引列表 |
 | `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills 能力摘要 |
+| `{{LANGUAGE_CODE_STANDARDS}}` | profile.language + code-standards 模板 | 语言专属编码规范, 未命中时使用 generic |
 
 **条件 block 语法:**
 - `{{#dim-database}}...{{/dim-database}}` — 命中 database 维度时展开 block 内容
@@ -219,7 +279,7 @@ multiSelect: false
 
 维度 block 展开逻辑: 命中维度时保留 block 内容并去掉 `{{#dim-*}}` / `{{/dim-*}}` 标签; 未命中时整块删除. 能力 block 只有在 `available && confirmed` 同时成立时展开. 条件 inline (`{{#has_*}}`) 同理.
 
-### 5.3 写入输出文件
+### 6.3 写入输出文件
 
 将填充后的内容写入 target-path 下的三个文件:
 
@@ -230,12 +290,13 @@ multiSelect: false
 ```
 
 已存在文件处理:
-1. 若存在, 使用 AskUserQuestion 询问: 覆盖 (备份到 `.governance-backup/`) / 合并 / 跳过
-2. 覆盖模式: 备份旧文件, 写入新文件
-3. 合并模式: 保留旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新
-4. 跳过: 不写入
+1. 使用 Phase 2 已确认的文件级策略: 覆盖 (备份到 `.governance-backup/`) / 合并 / 跳过.
+2. 覆盖模式: 备份旧文件, 写入新文件.
+3. 合并模式: 保留旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新.
+4. 跳过: 不写入.
+5. 若 Phase 2 未记录某个已存在文件的处理策略, 必须暂停并再次询问, 不得默认覆盖.
 
-### 5.4 来源标注
+### 6.4 来源标注
 
 每个生成文件的 section 末尾添加 HTML 注释标注填充来源:
 
@@ -247,7 +308,7 @@ multiSelect: false
 <!-- source: capability-detect, confirmed: true -->
 ```
 
-## Phase 6: 完成摘要
+## Phase 7: 完成摘要
 
 展示生成结果:
 
@@ -272,20 +333,26 @@ multiSelect: false
 | target-path 为空 | 默认 `.` |
 | 目标路径无项目特征 | 提示, 询问是否继续最小生成 (仅 base 模板, 无维度叠加) |
 | Workflow 部分 agent 失败 | 标注该维度数据盲区, 其余正常 |
+| 多个工具入口同时存在 | 提示用户选择本次生成/更新的工具入口 |
+| 已有治理文档但用户未确认处理策略 | 停止写入该文件, 询问合并/覆盖/跳过 |
 | 能力检测失败 | 不生成特定 MCP/skill 强制规则, 仅生成通用降级规则 |
 | 用户跳过能力确认 | 不写入特定 MCP/skill 规则 |
 | 模板文件缺失 | 降级到 skill 内置 fallback 模板 |
+| 语言编码规范模板缺失 | 使用 `code-standards/generic.md`; 若 generic 也缺失, 生成最小代码质量规则 |
 | 用户中断交互 | 保留分析结果, 下次可续接 |
 
 ## 自检清单
 
 - [ ] 参数解析正确 (target-path, --tool)
 - [ ] Workflow 返回有效项目画像
+- [ ] 已扫描现有治理文档和工具入口
+- [ ] 已确认已有文件的合并/覆盖/跳过策略
 - [ ] 维度判定正确
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则
 - [ ] 用户确认的 MCP/skills 条件 block 正确展开
-- [ ] 三轮交互完成
+- [ ] 四轮交互完成
 - [ ] 模板选择正确
+- [ ] 语言专属编码规范模板选择正确
 - [ ] 占位符全部填充, 无残留 `{{ }}`
 - [ ] 维度 block 正确展开/删除
 - [ ] 已存在文件正确处理

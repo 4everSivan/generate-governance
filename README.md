@@ -16,14 +16,14 @@
 ## 适用场景
 
 - 为新项目建立 AI 协作基线, 明确 AI 可以做什么、不能做什么、遇到生产风险时如何降级。
-- 为已有项目补齐 `constitution.md`, `AGENTS.md` 和工具入口文件, 降低不同 AI 工具之间的规则漂移。
+- 为已有项目补齐或刷新 `constitution.md`, `AGENTS.md` 和工具入口文件, 在合并前先识别已有 `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md` 等文件, 降低不同 AI 工具之间的规则漂移。
 - 在团队中推广统一的 AI 使用规范, 把安全红线、事实来源、测试命令和工具能力边界写成可版本化文档。
 - 为数据库、部署、运维等高风险项目增加可恢复、可审计、低风险优先的操作约束。
 
 ## 设计原则
 
 - **分层治理**: 红线归 `constitution.md`, 项目事实归 `AGENTS.md`, 工具差异归 `{TOOL}.md`, 避免同一规则在多个文件里互相冲突。
-- **保守生成**: 检测不到的能力不生成强制规则; 用户未确认的 MCP / skill 不写入项目规范。
+- **保守生成**: 检测不到的能力不生成强制规则; 用户未确认的 MCP / skill 不写入项目规范; 已存在的治理文档未经确认不覆盖。
 - **面向审查**: 模板保留来源注释, 便于区分扫描结果、推断内容、用户输入和能力检测结果。
 - **最小安装面**: npm CLI 只负责复制 skill 文件, 不修改目标项目业务代码, 不执行治理生成流程。
 
@@ -43,6 +43,8 @@
 - 检查认证、权限、敏感数据处理和输入校验等安全线索。
 - 按命中的治理维度选择模板, 并收集用户自定义红线。
 - 支持条件生成 MCP / skills 规则, 包括 Semble, TokenSave, Headroom, Context7, Fetch 以及部分文档和架构类 skills。
+- 生成前扫描目标项目已有治理文档和工具入口, 支持按文件选择合并、覆盖或跳过。
+- 根据项目主语言注入语言专属编码规范模板, 未命中时降级到通用编码规范。
 
 ## 输出文件分层
 
@@ -57,7 +59,7 @@
 ## 工作流
 
 ```
-项目代码 → 并行分析 (4 Agents) → 项目画像 → 维度确认 → 环境能力确认 → 维度红线收集 → 模板填充 → 输出三件套
+项目代码 → 并行分析 (4 Agents) → 项目画像 → 现有文档扫描 → 维度确认 → 环境能力确认 → 维度红线收集 → 模板填充 → 输出三件套
 ```
 
 ### Phase 1: 并行分析
@@ -71,13 +73,14 @@
 | config | 构建/运行脚本、CI/CD 管线、部署描述符 (Dockerfile, K8s, Terraform) |
 | security | 认证机制、敏感数据处理、权限模型、输入校验 |
 
-### Phase 2-4: 交互确认
+### Phase 2-5: 交互确认
 
+- 扫描已有 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`, 由用户确认合并、覆盖或跳过
 - 确认检测到的项目画像（语言、框架、维度）
 - 检测当前环境可用的 MCP / skills, 由用户确认是否写入生成规范
 - 收集用户自定义安全红线（按维度）
 
-### Phase 5: 模板填充
+### Phase 6: 模板填充
 
 根据命中的治理维度选择模板，填充占位符后输出文档。
 
@@ -87,7 +90,8 @@
 
 - 不自动修改目标项目业务代码。
 - 不自动提交 git commit, 不 push, 不发布 npm 包。
-- 目标路径已有治理文档时, 按 skill 流程询问覆盖、合并或跳过。
+- 目标路径已有治理文档时, 必须先展示已有文件和工具入口检测结果, 再由用户确认覆盖、合并或跳过。
+- 多个工具入口文件同时存在时, 必须由用户选择本次更新的 `{TOOL}.md`, 不静默覆盖多个入口。
 - 生产操作相关规则默认只读优先, 写操作需要明确目标环境和用户授权。
 - 外部文档、源码和搜索结果只证明机制边界, 不替代项目现场证据。
 
@@ -104,11 +108,18 @@ templates/governance/
 ├── agents/                # AGENTS.md 模板
 │   ├── base.md
 │   └── dim-*.md
-└── tool-entry/            # 工具入口模板
-    ├── claude.md
-    ├── gemini.md
-    ├── codex.md
-    └── kiro.md
+├── tool-entry/            # 工具入口模板
+│   ├── claude.md
+│   ├── gemini.md
+│   ├── codex.md
+│   └── kiro.md
+└── code-standards/        # 语言专属编码规范模板
+    ├── generic.md
+    ├── go.md
+    ├── java.md
+    ├── python.md
+    ├── rust.md
+    └── typescript.md
 ```
 
 ## 支持的治理维度
@@ -119,6 +130,21 @@ templates/governance/
 | **database** | 检测到 DB 驱动或迁移脚本 | 禁止无备份 DDL、禁止生产 DROP TABLE |
 | **deploy** | 检测到 Docker/K8s/Terraform/CI | 禁止绕过 CI 部署、金丝雀发布强制等待 |
 | **maintenance** | 检测到监控/告警配置 | 禁止无告警变更、变更窗口限制 |
+
+## 语言编码规范
+
+代码治理维度会根据 `workflow-analyze.js` 推断出的主语言, 向 `constitution.md` 和 `AGENTS.md` 注入对应的编码规范模板。
+
+| 主语言 | 模板 |
+|--------|------|
+| Go / Golang | `templates/governance/code-standards/go.md` |
+| Python | `templates/governance/code-standards/python.md` |
+| TypeScript / JavaScript / Node.js | `templates/governance/code-standards/typescript.md` |
+| Java / Kotlin / Spring | `templates/governance/code-standards/java.md` |
+| Rust | `templates/governance/code-standards/rust.md` |
+| 其他或低置信度 | `templates/governance/code-standards/generic.md` |
+
+语言规范只作为项目现有 formatter, linter, test convention 和架构约定的补充; 如果目标项目已有更具体的规范, 生成文档应优先引用项目内已有规范。
 
 ## 可选环境能力规则
 
@@ -144,6 +170,29 @@ templates/governance/
 - **Kiro** — 生成 `KIRO.md`
 
 工具入口自动检测优先级: `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → 默认 Claude。
+
+若目标项目已存在多个工具入口文件, 自动检测结果只作为推荐值; 生成前仍需要用户确认本次更新哪个入口文件。
+
+## 已有文件处理
+
+生成前会扫描:
+
+- `constitution.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `GEMINI.md`
+- `CODEX.md`
+- `KIRO.md`
+
+对已存在文件支持三种策略:
+
+| 策略 | 行为 |
+|------|------|
+| 合并 | 保留 `<!-- user-custom -->...<!-- /user-custom -->` 区块, 更新其余生成内容 |
+| 覆盖 | 先备份到 `.governance-backup/`, 再写入新文件 |
+| 跳过 | 保留现有文件, 不写入 |
+
+未确认策略的已有文件不会被写入。
 
 ## 使用
 
