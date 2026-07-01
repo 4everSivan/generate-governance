@@ -257,7 +257,7 @@ const SUMMARIZE_SCHEMA = {
         framework: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
         arch_pattern: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
         dimensions: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
-        api: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
+        api: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
       },
     },
   },
