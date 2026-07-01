@@ -1,0 +1,32 @@
+{
+  "name": "generate-governance-skill",
+  "version": "0.1.0",
+  "description": "Install the generate-governance AI governance skill into a local or user skills directory.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "generate-governance-skill": "./bin/install.js"
+  },
+  "files": [
+    "bin",
+    "skill.md",
+    "workflow-analyze.js",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node bin/install.js --dry-run --target /tmp/generate-governance-skill-test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "governance",
+    "skill",
+    "claude",
+    "codex"
+  ]
+}

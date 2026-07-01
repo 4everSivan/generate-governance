@@ -109,12 +109,49 @@ templates/governance/
 
 ## 安装
 
-将本 skill 放入项目的 `.agents/skills/generate-governance/` 目录，或安装为 Claude Code 全局 skill。
+### 通过 npm / npx 安装
+
+```bash
+# 安装到用户级 agents skills 目录: ~/.agents/skills/generate-governance
+npx generate-governance-skill install
+
+# 安装到当前项目: ./.agents/skills/generate-governance
+npx generate-governance-skill install --project .
+
+# 安装到 Codex 用户级 skills 目录: ~/.codex/skills/generate-governance
+npx generate-governance-skill install --codex
+
+# 指定 skills 目录或具体 skill 目录
+npx generate-governance-skill install --target ~/.agents/skills
+npx generate-governance-skill install --target ~/.agents/skills/generate-governance
+
+# 预览安装计划
+npx generate-governance-skill install --dry-run
+```
+
+若目标目录已存在, 安装器会停止并提示; 确认要替换时使用:
+
+```bash
+npx generate-governance-skill install --force
+```
+
+也可以全局安装:
+
+```bash
+npm install -g generate-governance-skill
+generate-governance-skill install --project .
+```
+
+### 手动安装
+
+将本 skill 放入项目的 `.agents/skills/generate-governance/` 目录，或安装为用户级 skill。
 
 ## 项目结构
 
 ```
 generate-governance/
+├── package.json                # npm 包定义
+├── bin/install.js              # npm CLI 安装器
 ├── skill.md                    # Skill 定义与完整指令
 ├── workflow-analyze.js         # Workflow 脚本：并行分析 + 项目画像合成
 ├── templates/governance/       # 治理文档模板
