@@ -27,9 +27,9 @@
 
 ## 3. 规则层级与单一事实源映射
 
-优先级 (高→低): 工具系统指令 > `constitution.md` > 本文件 `AGENTS.md` > 工具入口 > generated subagent body > `.agents/skills/*` > 设计说明 > 单次偏好.
+优先级 (高→低): `constitution.md` > 工具系统指令 > 本文件 `AGENTS.md` > 工具入口 > generated subagent body > `.agents/skills/*` > 设计说明 > 单次偏好.
 
-冲突裁决: 安全红线以 `constitution.md` 为准; 项目路径/脚本/数据入口以本文件为准; 用户授权不能覆盖 `constitution.md` 红线.
+冲突裁决: 项目路径/脚本/数据入口以本文件为准; 用户授权不能覆盖 `constitution.md` 红线.
 
 **每个概念只许有一个家 (single source)**:
 
