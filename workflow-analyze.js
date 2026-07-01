@@ -261,7 +261,7 @@ const SUMMARIZE_SCHEMA = {
       },
     },
   },
-  required: ['project_name', 'language', 'framework', 'domain', 'role', 'priorities', 'dimensions', 'scope'],
+  required: ['project_name', 'language', 'framework', 'domain', 'role', 'priorities', 'dimensions', 'scope', 'api_summary'],
 }
 
 const SUMMARIZE_PROMPT = `Synthesize a project profile from these five analysis results. The profile will drive governance document generation.
