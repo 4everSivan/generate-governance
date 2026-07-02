@@ -36,8 +36,10 @@ allowed-tools:
 3. 使用 Workflow 工具执行 `workflow-analyze.js`:
 
 ```
-Workflow({scriptPath: ".agents/skills/generate-governance/workflow-analyze.js", args: {targetPath: "<target-path>"}})
+Workflow({scriptPath: "workflow-analyze.js", args: {targetPath: "<target-path>"}})
 ```
+
+`scriptPath` 用相对 skill 自身根目录的路径 (`workflow-analyze.js`), 不写死 `.agents/skills/...` 或 `~/.codex/skills/...` 等具体安装路径. skill 运行时的工作目录即 skill 根, 这样无论安装到 `.agents/skills/` 还是 `~/.codex/skills/` 都能正确加载.
 
 4. 获取项目画像 (project profile JSON).
 
@@ -206,7 +208,9 @@ API 维度影响优先级:
 
 - 同时命中 database 和 api: `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`
 - 命中 api 但未命中 database: `API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`
-- 内部 API 且无敏感数据: `接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度`
+- 内部 API 且无敏感数据 (仅经用户显式确认后): `接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度`
+
+不得仅因缺少 auth entrypoints 就推断为内部 API 并降级优先级; 缺少 auth 证据是不确定性与风险, 应在画像中标注 "auth 未检测, 风险未知" 由用户确认, 而非自动套用内部 API 优先级.
 
 ### 5.2 模板填充
 
@@ -361,7 +365,7 @@ API 维度影响优先级:
 - [ ] API 维度证据已展示并由用户确认
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则
 - [ ] 用户确认的 MCP/skills 条件 block 正确展开
-- [ ] 四轮交互完成
+- [ ] 交互确认流程完成 (Phase 2-4: 检测结果确认, 能力确认, 红线收集)
 - [ ] 模板选择正确
 - [ ] 语言专属编码规范模板选择正确
 - [ ] 占位符全部填充, 无残留 `{{ }}`

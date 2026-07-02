@@ -278,7 +278,7 @@ Instructions:
 2. **language / framework**: From code structure analysis.
 3. **domain**: Describe the project's domain in Chinese. Be specific — "电商后端服务" is better than "后端服务".
 4. **role**: Construct the expert role in Chinese. Pattern: "精通 {language} 的 {domain_specialist}". For Go backend → "精通 Go 的后端架构师". For Python data → "精通 Python 的数据工程师". Add DB expertise if dim-database applies.
-5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. If api applies with database, use 数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度. If api applies without database, start with API 安全与契约兼容. If api applies with no sensitive data exposure (internal API: auth_entrypoints empty AND security_summary shows no sensitive data fields), start with 接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度. For non-DB, non-API projects, start with 服务可用性.
+5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. If api applies with database, use 数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度. If api applies without database, start with API 安全与契约兼容. Do NOT auto-downgrade priority based on missing auth entrypoints: absent auth evidence is an uncertainty or risk to flag in scope/evidence (e.g. note "auth 未检测, 风险未知"), not a signal to treat the API as internal and switch to 接口契约稳定性. If the user later explicitly confirms an API is internal with no sensitive data, 接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度 may be used — but this requires explicit user confirmation, not inference from empty auth_entrypoints. For non-DB, non-API projects, start with 服务可用性.
 6. **dimensions**: Determine which governance dimensions apply:
    - code: ALWAYS
    - database: if db_driver deps are present OR migration scripts found

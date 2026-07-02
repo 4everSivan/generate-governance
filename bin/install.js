@@ -6,7 +6,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SKILL_NAME = 'generate-governance'
-const REQUIRED_ITEMS = ['skill.md', 'workflow-analyze.js', 'templates', 'README.md', 'LICENSE']
+// Skill directory only needs runtime assets. README.md / CHANGELOG.md are
+// repo-level docs, not part of the installed skill (per skill-creator guidance).
+const REQUIRED_ITEMS = ['skill.md', 'workflow-analyze.js', 'templates', 'LICENSE']
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
