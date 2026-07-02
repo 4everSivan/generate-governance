@@ -14,7 +14,7 @@
 
 - **[强制] 事务边界清晰**: 数据库写操作必须明确事务边界, 避免在事务中执行不可控外部 I/O.
 - **[默认] 并发集合选择**: 跨线程共享集合用 `ConcurrentHashMap` / `CopyOnWriteArrayList` 或显式锁, 不用 `Collections.synchronizedXxx` 包装后自行细粒度锁.
-- **[默认] Optional 语义**: 用 `Optional` 表达可能缺失的返回值, 不用 `Optional` 作字段或参数, 不用 null 表达多种业务状态.
+- **[默认] Optional 语义**: 用 `Optional` 表达可能缺失的返回值, 不用 `Optional` 作字段或参数.
 
 ### 安全与边界
 
