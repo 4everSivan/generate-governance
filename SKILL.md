@@ -29,11 +29,21 @@ allowed-tools:
 
 ## Phase 1: 项目分析
 
-调用 Workflow 并行分析目标项目:
+### 运行时检测
+
+先检测当前运行环境, 决定走哪条分析路径:
+
+- **Claude Code 路径 (Phase 1-C)**: 若当前环境提供 `Workflow` 工具, 走此路径. 用 `workflow-analyze.js` 并行 5 agent 分析, 产出结构化 project profile JSON, 交互用 `AskUserQuestion`.
+- **Codex 降级路径 (Phase 1-D)**: 若无 `Workflow` 工具 (Codex 等环境), 走此路径. 用 Grep/Glob/Read 指令式扫描目标项目, 复杂维度可选派 subagent 深入, 自行组装与 Claude Code 路径结构一致的 project profile JSON, 交互用纯文本提问.
+
+两条路径产出的 project profile JSON 结构必须一致 (字段名, 嵌套, enum 值对齐 `workflow-analyze.js` 的 SUMMARIZE_SCHEMA), 以保证后续 Phase 2-5 模板填充无差异.
 
 1. 确认 target-path 存在且包含可识别项目特征 (go.mod / package.json / Cargo.toml / requirements.txt / Makefile / src/ 等).
 2. 若不满足, 提示用户并询问是否继续最小生成.
-3. 使用 Workflow 工具执行 `workflow-analyze.js`:
+
+### Phase 1-C: Claude Code 路径
+
+使用 Workflow 工具执行 `workflow-analyze.js`:
 
 ```
 Workflow({scriptPath: "workflow-analyze.js", args: {targetPath: "<target-path>"}})
@@ -41,7 +51,47 @@ Workflow({scriptPath: "workflow-analyze.js", args: {targetPath: "<target-path>"}
 
 `scriptPath` 用相对 skill 自身根目录的路径 (`workflow-analyze.js`), 不写死 `.agents/skills/...` 或 `~/.codex/skills/...` 等具体安装路径. skill 运行时的工作目录即 skill 根, 这样无论安装到 `.agents/skills/` 还是 `~/.codex/skills/` 都能正确加载.
 
-4. 获取项目画像 (project profile JSON).
+获取项目画像 (project profile JSON), 进入 Phase 2.
+
+### Phase 1-D: Codex 降级路径
+
+不调用 `workflow-analyze.js` (它依赖 Claude Code Workflow API). 改为指令式扫描目标项目, 自行组装 project profile JSON.
+
+**1.D.1 指令式扫描 (主)**
+
+用 Grep/Glob/Read 执行以下扫描, 覆盖 5 个分析维度:
+
+- **语言与构建**: `Glob **/{go.mod,package.json,Cargo.toml,requirements.txt,pyproject.toml,Makefile,setup.py}` → 推断主语言与构建系统.
+- **依赖分类**: `Read` 依赖文件 (manifest / lock), `Grep` 关键词分类: db_driver (postgres/mysql/redis/mongo/sqlalchemy/gorm) / mq (kafka/rabbitmq/nats) / cache (redis/memcached) / http (express/gin/fastapi/axios) / auth (jwt/passport/oauth).
+- **部署维度**: `Glob **/{Dockerfile,docker-compose*.yml,docker-compose*.yaml,k8s/**/*.yaml,*.tf,*.tfvars}` → deploy 证据.
+- **API 维度**: `Glob **/{routes,controllers,handlers,api,endpoints,app/api,pages/api}/**` + `Glob **/{openapi.yaml,openapi.yml,swagger.json,schema.graphql,*.proto,asyncapi.yaml}` → api 证据 (框架/路由/契约).
+- **安全维度**: `Grep -i "auth|secret|token|password|credential|permission"` → security 证据 (认证机制/敏感数据).
+- **运维维度**: `Glob **/{monitoring,alerts,grafana,prometheus,alertmanager}/**` + `Glob **/{prometheus.yml,alertmanager.yml,rules.yml}` → maintenance 证据.
+
+**1.D.2 可选 subagent 深入**
+
+对命中的复杂维度, 派 subagent 深入 (仅当证据量大或分散时):
+
+- **api 命中且 routes/controllers 文件多**: 派一个 subagent, 任务 "读取 `<target-path>` 下 routes/ 与 controllers/ 的 handler 文件, 总结: 使用的 API 框架, 路由路径列表, 认证入口文件, 契约文件". subagent 返回结构化文本, 提取填入 api_summary.
+- **security 命中且证据分散**: 派一个 subagent, 任务 "扫描 `<target-path>` 的认证机制与敏感数据处理, 总结: auth_mechanism, 敏感字段处理位置, 权限模型". 提取填入 security_summary.
+
+subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 profile, 不直接信任 subagent 的推断结论 (需有代码证据).
+
+**1.D.3 组装 project profile JSON**
+
+按 `workflow-analyze.js` 的 SUMMARIZE_SCHEMA 结构组装:
+
+- `project_name`: 目标目录名, 或 manifest 的 name 字段.
+- `language` / `framework`: 从语言与构建扫描得出.
+- `domain`: 用中文描述项目领域 (具体优于泛化, "电商后端服务" 优于 "后端服务").
+- `role`: 中文专家角色, 模式 "精通 {language} 的 {domain_specialist}".
+- `priorities`: 有序优先级列表. 命中 database+api → `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`; 命中 api 无 database → `API 安全与契约兼容 > ...`; 非 DB 非 API → `服务可用性 > ...`. **不得仅因缺 auth entrypoints 推断 internal API 并降级** (对齐 review-checklist:27); 缺 auth 证据标注 "auth 未检测, 风险未知".
+- `dimensions`: code 总是命中; database (db_driver 依赖或迁移脚本); api (路由/控制器/契约/框架/测试证据); deploy (Dockerfile/k8s/Terraform/CI); maintenance (监控/告警配置). api 缺 auth 证据标 LOW confidence.
+- `scope`: 关键技术逗号分隔列表.
+- `api_summary`: { frameworks, route_paths, schema_files, auth_entrypoints, test_paths, evidence, confidence }.
+- `confidence`: { language, framework, arch_pattern, dimensions, api } 各 HIGH/MEDIUM/LOW.
+
+组装后进入 Phase 2 (用 Codex 降级交互, 见各 Phase 的 Codex 文本提问说明).
 
 ## Phase 2: 第一轮交互 — 检测结果确认 (现有文档与维度)
 
