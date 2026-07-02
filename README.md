@@ -285,7 +285,7 @@ generate-governance/
 ├── CHANGELOG.md                # 发布变更记录
 ├── package.json                # npm 包定义
 ├── bin/install.js              # npm CLI 安装器
-├── skill.md                    # Skill 定义与完整指令
+├── SKILL.md                    # Skill 定义与完整指令
 ├── workflow-analyze.js         # Workflow 脚本：并行分析 + 项目画像合成
 ├── templates/governance/       # 治理文档模板
 └── README.md

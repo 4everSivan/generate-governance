@@ -73,14 +73,14 @@ function parseDimensions(workflow) {
 }
 
 function checkTemplateTokens() {
-  const skillMd = read('skill.md')
+  const skillMd = read('SKILL.md')
   const declared = new Set(extractDeclaredTokens(skillMd))
   const templateFiles = walk('templates').filter((file) => file.endsWith('.md'))
   const usedTokens = unique(templateFiles.flatMap((file) => extractTemplateTokens(read(file))))
 
   for (const token of usedTokens) {
     if (!declared.has(token)) {
-      fail(`Template token {{${token}}} is not declared in skill.md`)
+      fail(`Template token {{${token}}} is not declared in SKILL.md`)
     }
   }
 }
@@ -202,7 +202,7 @@ function checkGitignore() {
 function checkPackageFiles() {
   const pkg = JSON.parse(read('package.json'))
   const files = new Set(pkg.files ?? [])
-  const required = ['bin', 'scripts', 'skill.md', 'workflow-analyze.js', 'templates', 'README.md', 'CHANGELOG.md', 'LICENSE']
+  const required = ['bin', 'scripts', 'SKILL.md', 'workflow-analyze.js', 'templates', 'README.md', 'CHANGELOG.md', 'LICENSE']
 
   for (const item of required) {
     if (!files.has(item)) {
