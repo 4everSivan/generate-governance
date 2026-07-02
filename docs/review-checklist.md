@@ -1,0 +1,54 @@
+# Governance Skill Review Checklist
+
+This checklist covers professional judgment that should stay human-reviewed. Automated checks live in `scripts/check-consistency.mjs` and only validate deterministic consistency rules.
+
+## Scope
+
+- Keep this project a pure skill: templates, instructions, fixtures, and static checks only.
+- Do not introduce a full document generator, merge engine, or runtime renderer without a separate design review.
+- Generated planning/spec documents under `docs/superpowers/` are local working artifacts and should stay ignored.
+
+## Rule Hierarchy
+
+- Platform, system, developer, and tool safety instructions must not be overridden by generated project documents.
+- Within project governance documents, `constitution.md` is the highest project-level policy.
+- `AGENTS.md` should hold project facts, scripts, topology, and confirmed environment capabilities.
+- Tool entry files should only describe tool-specific behavior and refer back to `constitution.md` and `AGENTS.md`.
+
+## Dimension Quality
+
+- Every enabled dimension must be based on scan evidence or explicit user confirmation.
+- Low-confidence detection must be presented as a confirmation question, not silently converted into a hard rule.
+- New dimensions must add both `constitution/dim-*.md` and `agents/dim-*.md`.
+- Dimension templates must not duplicate base red lines unless they add domain-specific precision.
+
+## API Governance
+
+- Do not infer "internal API" only from missing auth entrypoints; missing auth evidence is an uncertainty or risk.
+- Public API changes should preserve authentication, authorization, response privacy, and contract compatibility.
+- Contract drift should be resolved by explicit user confirmation, not by assuming implementation or schema always wins.
+- API tests should not be invented. If absent, mark them as a validation gap.
+
+## Existing Documents
+
+- Existing `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, or `KIRO.md` must trigger a merge/overwrite/skip decision.
+- Multiple existing tool entries must trigger a target tool confirmation.
+- Merge mode may preserve `<!-- user-custom -->...<!-- /user-custom -->` sections, but should not silently drop user text outside those sections without warning.
+
+## Environment Capabilities
+
+- MCP and skill rules may be generated only when the capability is detected and confirmed by the user.
+- Missing capabilities must not become project requirements.
+- Capability rules should describe use boundaries and fallback behavior.
+
+## Language Standards
+
+- Language-specific templates should complement existing formatter, linter, and architecture conventions.
+- Do not let generic language guidance override stronger project-local standards.
+- Keep language standards concise enough to be useful in generated documents.
+
+## Release Review
+
+- `README.md`, `CHANGELOG.md`, package `files`, and install behavior should describe the same shipped capability set.
+- `npm pack --dry-run` should not include local planning docs, IDE metadata, or release drafting files.
+- New fixtures under `examples/` should include `expected.md` with human-readable assertions.

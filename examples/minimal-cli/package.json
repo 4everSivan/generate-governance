@@ -1,0 +1,12 @@
+{
+  "name": "minimal-cli-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "minimal-cli-fixture": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "node src/cli.js --check"
+  }
+}

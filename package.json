@@ -9,6 +9,7 @@
   },
   "files": [
     "bin",
+    "scripts",
     "skill.md",
     "workflow-analyze.js",
     "templates",
@@ -17,6 +18,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "check": "node scripts/check-consistency.mjs",
     "test": "node bin/install.js --dry-run --target /tmp/generate-governance-skill-test"
   },
   "engines": {
