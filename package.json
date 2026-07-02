@@ -3,6 +3,15 @@
   "version": "0.2.0",
   "description": "Install the generate-governance AI governance skill into a local or user skills directory.",
   "license": "MIT",
+  "author": "4everSivan <961014738@qq.com>",
+  "homepage": "https://github.com/4everSivan/generate-governance#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4everSivan/generate-governance.git"
+  },
+  "bugs": {
+    "url": "https://github.com/4everSivan/generate-governance/issues"
+  },
   "type": "module",
   "bin": {
     "generate-governance-skill": "./bin/install.js"
@@ -31,6 +40,10 @@
     "governance",
     "skill",
     "claude",
-    "codex"
+    "codex",
+    "gemini",
+    "kiro",
+    "constitution",
+    "agents-md"
   ]
 }
