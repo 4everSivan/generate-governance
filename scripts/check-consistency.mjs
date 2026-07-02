@@ -72,23 +72,6 @@ function parseDimensions(workflow) {
   return unique([...match[1].matchAll(/'([^']+)'/g)].map((item) => item[1]))
 }
 
-function extractEnumAfter(content, anchor) {
-  const start = content.indexOf(anchor)
-  if (start === -1) {
-    fail(`Could not find enum anchor: ${anchor}`)
-    return []
-  }
-
-  const slice = content.slice(start, start + 1500)
-  const match = slice.match(/enum:\s*\[([^\]]+)\]/m)
-  if (!match) {
-    fail(`Could not find enum after anchor: ${anchor}`)
-    return []
-  }
-
-  return unique([...match[1].matchAll(/'([^']+)'/g)].map((item) => item[1]))
-}
-
 function checkTemplateTokens() {
   const skillMd = read('skill.md')
   const declared = new Set(extractDeclaredTokens(skillMd))
@@ -118,13 +101,65 @@ function checkDimensionTemplates() {
   }
 }
 
+// Extract the enum values of the FIRST `confidence: { type: 'string', enum: [...] }`
+// field that appears within `block` (a pre-sliced snippet of the workflow source).
+// Slicing to the exact schema block first avoids matching an unrelated `confidence`
+// field elsewhere in the file (e.g. CODE_STRUCTURE_SCHEMA.confidence).
+function extractConfidenceEnum(block, label) {
+  const match = block.match(/confidence:\s*\{\s*type:\s*'string',\s*enum:\s*\[([^\]]+)\]/m)
+  if (!match) {
+    fail(`Could not find confidence enum in ${label}`)
+    return []
+  }
+  return unique([...match[1].matchAll(/'([^']+)'/g)].map((item) => item[1]))
+}
+
+// Slice the workflow source from `const NAME = {` up to the next top-level
+// `const ` declaration (or end of file), returning just that schema block.
+function sliceSchemaBlock(workflow, name) {
+  const startMatch = workflow.match(new RegExp(`const ${name} = \\{`))
+  if (!startMatch) {
+    fail(`Could not find schema block: ${name}`)
+    return ''
+  }
+  const start = startMatch.index
+  const rest = workflow.slice(start + startMatch[0].length)
+  const nextConst = rest.search(/\nconst \w+ = /)
+  const blockEnd = nextConst === -1 ? rest.length : nextConst
+  return workflow.slice(start, start + startMatch[0].length + blockEnd)
+}
+
 function checkApiConfidenceEnums() {
   const workflow = read('workflow-analyze.js')
-  const apiSchema = extractEnumAfter(workflow, "confidence: { type: 'string'")
-  const apiSummary = extractEnumAfter(workflow, 'api_summary:')
-  const confidenceApi = extractEnumAfter(workflow, 'api: { type:')
 
-  const serialized = [apiSchema, apiSummary, confidenceApi].map((values) => values.join('|'))
+  // API_SCHEMA.confidence — anchor inside the API_SCHEMA block only.
+  const apiSchemaEnum = extractConfidenceEnum(sliceSchemaBlock(workflow, 'API_SCHEMA'), 'API_SCHEMA')
+
+  // api_summary.confidence — anchor inside the SUMMARIZE_SCHEMA.api_summary sub-object.
+  const summarizeBlock = sliceSchemaBlock(workflow, 'SUMMARIZE_SCHEMA')
+  const apiSummaryMatch = summarizeBlock.match(/api_summary:\s*\{([\s\S]*?)\n\s{4}\},/m)
+  if (!apiSummaryMatch) {
+    fail('Could not find api_summary block inside SUMMARIZE_SCHEMA')
+    return
+  }
+  const apiSummaryEnum = extractConfidenceEnum(apiSummaryMatch[1], 'api_summary')
+
+  // SUMMARIZE_SCHEMA.confidence.api — the `api:` field inside the confidence object.
+  // Anchor on the top-level `confidence:` (4-space indent) to avoid matching the
+  // nested `api_summary.confidence` string field (8-space indent).
+  const confidenceMatch = summarizeBlock.match(/\n {4}confidence:\s*\{([\s\S]*?)\n {4}\},/m)
+  if (!confidenceMatch) {
+    fail('Could not find confidence block inside SUMMARIZE_SCHEMA')
+    return
+  }
+  const apiFieldMatch = confidenceMatch[1].match(/api:\s*\{\s*type:\s*'string',\s*enum:\s*\[([^\]]+)\]/m)
+  if (!apiFieldMatch) {
+    fail('Could not find confidence.api enum inside SUMMARIZE_SCHEMA.confidence')
+    return
+  }
+  const confidenceApiEnum = unique([...apiFieldMatch[1].matchAll(/'([^']+)'/g)].map((item) => item[1]))
+
+  const serialized = [apiSchemaEnum, apiSummaryEnum, confidenceApiEnum].map((values) => values.join('|'))
   if (new Set(serialized).size !== 1) {
     fail(`API confidence enums differ: ${serialized.join(' / ')}`)
   }
