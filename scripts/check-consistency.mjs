@@ -289,6 +289,44 @@ function checkExamples() {
   }
 }
 
+function checkKimiExamples() {
+  const requiredFiles = [
+    'examples/kimi-entry/expected.md',
+    'examples/kimi-entry/cases/kimi-md-only/KIMI.md',
+    'examples/kimi-entry/cases/native-only/.kimi-code/AGENTS.md',
+    'examples/kimi-entry/cases/both/KIMI.md',
+    'examples/kimi-entry/cases/both/.kimi-code/AGENTS.md',
+    'examples/kimi-entry/cases/kimi-and-kiro/KIMI.md',
+    'examples/kimi-entry/cases/kimi-and-kiro/KIRO.md',
+  ]
+
+  for (const file of requiredFiles) {
+    if (!exists(file)) {
+      fail(`Missing Kimi entry fixture file: ${file}`)
+    }
+  }
+
+  const expectedPath = 'examples/kimi-entry/expected.md'
+  if (!exists(expectedPath)) {
+    return
+  }
+
+  const expected = read(expectedPath)
+  for (const scenario of ['KIMI-only', 'native-only', 'both', 'Kimi + Kiro']) {
+    if (!expected.includes(scenario)) {
+      fail(`Kimi entry fixture missing scenario: ${scenario}`)
+    }
+  }
+  for (const strategy of ['merge', 'overwrite', 'skip']) {
+    if (!expected.includes(strategy)) {
+      fail(`Kimi entry fixture missing file strategy: ${strategy}`)
+    }
+  }
+  if (!expected.includes('分别确认')) {
+    fail('Kimi entry fixture must require per-file strategy confirmation')
+  }
+}
+
 checkTemplateTokens()
 checkDimensionTemplates()
 checkToolEntryTemplates()
@@ -298,6 +336,7 @@ checkAgentCount()
 checkGitignore()
 checkPackageFiles()
 checkExamples()
+checkKimiExamples()
 
 if (errors.length > 0) {
   console.error('Consistency check failed:')
