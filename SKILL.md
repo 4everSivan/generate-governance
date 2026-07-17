@@ -4,9 +4,9 @@ description: >-
   Analyze a project codebase and generate AI governance documents (constitution.md,
   AGENTS.md, {TOOL}.md). Automatically detects language, framework, architecture, and
   domain to produce role-appropriate governance constraints. Supports Claude, Gemini,
-  Codex, and Kiro tool entries. Use when the user wants to set up or refresh project
-  governance documentation. Manual-only: trigger only when user explicitly requests
-  governance generation.
+  Codex, Kiro, and Kimi Code tool entries. Use when the user wants to set up or refresh
+  project governance documentation. Manual-only: trigger only when user explicitly
+  requests governance generation.
 allowed-tools:
   - Read
   - Grep
@@ -19,13 +19,13 @@ allowed-tools:
 
 # Generate Governance
 
-为项目自动生成 AI 治理三件套: `constitution.md` (安全红线与工作模式), `AGENTS.md` (项目事实层), `{TOOL}.md` (工具入口).
+为项目自动生成 AI 治理三件套: `constitution.md` (安全红线与工作模式), `AGENTS.md` (项目事实层), `{TOOL}.md` (工具入口). Kimi Code 目标额外生成原生桥接入口 `.kimi-code/AGENTS.md`.
 
 ## 输入参数
 
-- `$ARGUMENTS` — `[target-path] [--tool claude|gemini|codex|kiro]`
+- `$ARGUMENTS` — `[target-path] [--tool claude|gemini|codex|kiro|kimi]`
 - target-path 默认为当前路径 (`.`); 无法识别为项目时提示用户指定.
-- `--tool` 指定目标工具入口; 未指定时根据项目现有入口文件自动检测 (检测顺序: CLAUDE.md → GEMINI.md → CODEX.md → KIRO.md → 默认 claude).
+- `--tool` 指定目标工具入口; 未指定时根据项目现有入口文件自动检测 (检测顺序: CLAUDE.md → GEMINI.md → CODEX.md → KIRO.md → KIMI.md 或 .kimi-code/AGENTS.md → 默认 claude).
 
 ## Phase 1: 项目分析
 
@@ -97,8 +97,8 @@ subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 p
 
 将现有治理文档与项目画像的检测结果**一次性**呈现给用户, 避免分多轮确认. 呈现内容:
 
-- **现有治理文档扫描**: 检测 `constitution.md` / `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `CODEX.md` / `KIRO.md` 是否存在, 每个文件是否含 `<!-- user-custom -->...<!-- /user-custom -->` 可保留区, 以及提议的处理策略 (默认: 合并).
-- **工具入口**: 自动检测顺序 `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → 默认 `claude`. 若多个工具入口同时存在, 必须提示用户选择本次生成/更新的 `{TOOL}.md`.
+- **现有治理文档扫描**: 检测 `constitution.md` / `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `CODEX.md` / `KIRO.md` / `KIMI.md` / `.kimi-code/AGENTS.md` 是否存在, 每个文件是否含 `<!-- user-custom -->...<!-- /user-custom -->` 可保留区, 以及提议的处理策略 (默认: 合并).
+- **工具入口**: 自动检测顺序 `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → (`KIMI.md` 或 `.kimi-code/AGENTS.md`) → 默认 `claude`. `KIMI.md` 或 `.kimi-code/AGENTS.md` 任一存在即识别为 Kimi; 两者同时存在只计为一个工具入口. 若多个不同工具入口同时存在, 必须提示用户选择本次生成/更新的工具.
 - **项目画像摘要**: 语言, 框架, 构建系统; 数据库/API/部署/监控特征; 命中维度 (code 总是命中; database/api/deploy/maintenance 条件命中).
 - **关联提示**: 若检测到已有 `constitution.md`, 标注"建议维度与现有 constitution 对齐", 避免用户因信息分批呈现而忽略文档与维度的关联.
 
@@ -128,6 +128,8 @@ constitution.md: merge
 AGENTS.md: merge
 CLAUDE.md: skip
 CODEX.md: overwrite
+KIMI.md: merge
+.kimi-code/AGENTS.md: skip
 
 # 维度修正 (增/删维度, 或修正检测结果)
 + api
@@ -140,7 +142,7 @@ CODEX.md: overwrite
 - **覆盖**: 备份到 `.governance-backup/` 后重写.
 - **跳过**: 保留现有文件, 不写入对应文件.
 
-**红线:** 未经用户确认, 不得覆盖或重写目标项目中已存在的 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`; 多工具入口不得静默覆盖.
+**红线:** 未经用户确认, 不得覆盖或重写目标项目中已存在的 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`, `KIMI.md`, `.kimi-code/AGENTS.md`; 多工具入口不得静默覆盖. Kimi 的两个入口必须分别记录文件级策略.
 
 ## Phase 3: 第二轮交互 — 环境能力检测与确认
 
@@ -247,6 +249,7 @@ api:
 - `templates/governance/constitution/base.md` + 每个命中维度的 `dim-{dimension}.md`
 - `templates/governance/agents/base.md` + 每个命中维度的 `dim-{dimension}.md`
 - `templates/governance/tool-entry/{tool}.md`
+- 仅当 `tool = kimi` 时, 额外读取 `templates/governance/tool-entry/kimi-native-agents.md`
 - `templates/governance/code-standards/{language}.md` 或 `templates/governance/code-standards/generic.md`
 
 模板路径: 优先查找项目 `templates/governance/`, 其次 skill 内置 `templates/governance/`.
@@ -365,7 +368,7 @@ API 维度影响优先级:
 
 ### 5.3 写入输出文件
 
-将填充后的内容写入 target-path 下的三个文件:
+普通工具将填充后的内容写入 target-path 下的三个文件:
 
 ```
 <target-path>/constitution.md
@@ -373,10 +376,21 @@ API 维度影响优先级:
 <target-path>/{TOOL}.md
 ```
 
+Kimi 写入四个文件:
+
+```
+<target-path>/constitution.md
+<target-path>/AGENTS.md
+<target-path>/KIMI.md
+<target-path>/.kimi-code/AGENTS.md
+```
+
+仅在用户确认生成 Kimi 后创建 `.kimi-code/` 目录. `KIMI.md` 与 `.kimi-code/AGENTS.md` 分别使用 Phase 2 确认的文件级策略; 两者不得绑定处理或相互代替.
+
 已存在文件处理:
 1. 使用 Phase 2 已确认的文件级策略: 覆盖 (备份到 `.governance-backup/`) / 合并 / 跳过.
-2. 覆盖模式: 备份旧文件, 写入新文件.
-3. 合并模式: 保留旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新.
+2. 覆盖模式: 分别备份旧文件, 写入新文件.
+3. 合并模式: 保留对应旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新; 标记外存在用户文本时先警告, 不静默丢弃.
 4. 跳过: 不写入.
 5. 若 Phase 2 未记录某个已存在文件的处理策略, 必须暂停并再次询问, 不得默认覆盖.
 
@@ -394,14 +408,15 @@ API 维度影响优先级:
 
 ## Phase 6: 完成摘要
 
-展示生成结果:
+展示生成结果. Kimi 目标示例:
 
 ```
 治理文档生成完成:
 
 ✅ constitution.md — 已确认维度与红线
 ✅ AGENTS.md — 项目事实层, 8 个章节
-✅ CLAUDE.md — Claude Code 工具入口
+✅ KIMI.md — Kimi Code CLI 完整工具入口
+✅ .kimi-code/AGENTS.md — Kimi Code CLI 原生桥接入口
 
 ⚠ 需确认项 (2 项):
   - 架构模式推断为 "分层架构" (confidence: MEDIUM)
@@ -419,10 +434,14 @@ API 维度影响优先级:
 | Workflow 部分 agent 失败 | 标注该维度数据盲区, 其余正常 |
 | 多个工具入口同时存在 | 提示用户选择本次生成/更新的工具入口 |
 | 已有治理文档但用户未确认处理策略 | 停止写入该文件, 询问合并/覆盖/跳过 |
+| `.kimi-code` 是普通文件或目录不可创建 | 不写入原生桥接文件并报告明确错误; 不宣称 Kimi 四文件完整 |
+| 跳过的 `.kimi-code/AGENTS.md` 未引用 `KIMI.md` | 警告 Kimi 可能不会加载完整工具入口 |
+| Kimi 桥接引用的根治理文件缺失或被跳过 | 在完成摘要中列为待确认项 |
 | API 检测证据较弱 | 标记 LOW confidence, 在维度确认阶段让用户决定是否启用 api |
 | API 模板缺失 | 跳过 api 维度并报告缺失模板, 不生成半截 API 红线 |
 | 能力检测失败 | 不生成特定 MCP/skill 强制规则, 仅生成通用降级规则 |
 | 用户跳过能力确认 | 不写入特定 MCP/skill 规则 |
+| Kimi 主入口或原生桥接模板缺失 | 停止对应入口生成并报告缺失, 不使用其他工具模板冒充 Kimi |
 | 模板文件缺失 | 降级到 skill 内置 fallback 模板 |
 | 语言编码规范模板缺失 | 使用 `code-standards/generic.md`; 若 generic 也缺失, 生成最小代码质量规则 |
 | 用户中断交互 | 保留分析结果, 下次可续接 |
@@ -433,6 +452,8 @@ API 维度影响优先级:
 - [ ] Workflow 返回有效项目画像
 - [ ] 已扫描现有治理文档和工具入口
 - [ ] 已确认已有文件的合并/覆盖/跳过策略
+- [ ] Kimi 双入口已按一个工具识别, 两个文件分别确认策略
+- [ ] 仅在确认 Kimi 后创建 `.kimi-code/`, 完成摘要报告四文件状态
 - [ ] 维度判定正确
 - [ ] API 维度证据已展示并由用户确认
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则

@@ -141,6 +141,24 @@ function checkToolEntryTemplates() {
   }
 }
 
+function checkKimiSkillContract() {
+  const skillMd = read('SKILL.md')
+  const requiredFragments = new Map([
+    ['tool argument', '--tool claude|gemini|codex|kiro|kimi'],
+    ['grouped entry detection', '`KIMI.md` 或 `.kimi-code/AGENTS.md` 任一存在'],
+    ['native template selection', 'templates/governance/tool-entry/kimi-native-agents.md'],
+    ['native output path', '<target-path>/.kimi-code/AGENTS.md'],
+    ['blocked native directory handling', '`.kimi-code` 是普通文件或目录不可创建'],
+    ['dual-entry self-check', 'Kimi 双入口'],
+  ])
+
+  for (const [label, fragment] of requiredFragments) {
+    if (!skillMd.includes(fragment)) {
+      fail(`SKILL.md missing Kimi ${label}: ${fragment}`)
+    }
+  }
+}
+
 // Extract the enum values of the FIRST `confidence: { type: 'string', enum: [...] }`
 // field that appears within `block` (a pre-sliced snippet of the workflow source).
 // Slicing to the exact schema block first avoids matching an unrelated `confidence`
@@ -274,6 +292,7 @@ function checkExamples() {
 checkTemplateTokens()
 checkDimensionTemplates()
 checkToolEntryTemplates()
+checkKimiSkillContract()
 checkApiConfidenceEnums()
 checkAgentCount()
 checkGitignore()
