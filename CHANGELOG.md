@@ -1,12 +1,23 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-07-17
 
 ### Added
 
-- 新增 Kimi Code CLI 双入口支持: `KIMI.md` 保存完整工具专属规则, `.kimi-code/AGENTS.md` 提供原生桥接入口.
-- 新增 Kimi 入口自动检测与逐文件 merge/overwrite/skip 保护; 任一入口可识别 Kimi, 两者同时存在只计为一个工具.
-- 新增 Kimi 模板、静态一致性契约和多入口 fixture.
+- 新增 Kimi Code CLI 双入口支持: `KIMI.md` 保存完整工具专属规则, `.kimi-code/AGENTS.md` 提供原生桥接入口。
+- 新增 Kimi 入口自动检测与逐文件 merge/overwrite/skip 保护; 任一入口可识别 Kimi, 两者同时存在只计为一个工具。
+- 新增 Kimi 模板、静态一致性契约和多入口 fixture。
+- 新增 Codex 运行时环境检测与文本交互降级路径（Phases 2-4）。
+
+### Changed
+
+- 重构代码标准，深化了 go/java/python/rust/typescript 等语言模板的分类治理规则。
+- 根据 Codex/Claude Code 规范，将 `skill.md` 重命名为 `SKILL.md`。
+- 在 `package.json` 中补充 repository/homepage/author/bugs 等 npm 发布元数据。
+
+### Fixed
+
+- 修复了关于安装路径、内部 API、安装范围以及版本的 Review 缺陷。
 
 ## [0.2.0] - 2026-07-02
 
