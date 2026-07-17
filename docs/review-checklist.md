@@ -14,6 +14,7 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 - Within project governance documents, `constitution.md` is the highest project-level policy.
 - `AGENTS.md` should hold project facts, scripts, topology, and confirmed environment capabilities.
 - Tool entry files should only describe tool-specific behavior and refer back to `constitution.md` and `AGENTS.md`.
+- `KIMI.md` should contain Kimi-specific behavior; `.kimi-code/AGENTS.md` should only bridge to root governance files and must not duplicate project facts or Kimi capability rules.
 
 ## Dimension Quality
 
@@ -31,8 +32,9 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 
 ## Existing Documents
 
-- Existing `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, or `KIRO.md` must trigger a merge/overwrite/skip decision.
+- Existing `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md`, `KIMI.md`, or `.kimi-code/AGENTS.md` must trigger a merge/overwrite/skip decision.
 - Multiple existing tool entries must trigger a target tool confirmation.
+- `KIMI.md` and `.kimi-code/AGENTS.md` together count as one Kimi tool, but their file strategies must be confirmed separately.
 - Merge mode may preserve `<!-- user-custom -->...<!-- /user-custom -->` sections, but should not silently drop user text outside those sections without warning.
 
 ## Environment Capabilities
@@ -52,3 +54,4 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 - `README.md`, `CHANGELOG.md`, package `files`, and install behavior should describe the same shipped capability set.
 - `npm pack --dry-run` should not include local planning docs, IDE metadata, or release drafting files.
 - New fixtures under `examples/` should include `expected.md` with human-readable assertions.
+- Kimi templates should use Kimi-native capabilities and must not present Claude-specific terms as Kimi features.

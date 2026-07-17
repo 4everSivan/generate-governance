@@ -1,12 +1,12 @@
 # generate-governance
 
-`generate-governance` 是一个用于生成项目级 AI 协作治理文档的 skill。它面向 Claude Code, Codex, Gemini CLI, Kiro 等 AI IDE / CLI 代理, 通过扫描目标代码库的语言、框架、依赖、配置和安全线索, 生成一套可审查、可追溯、可按工具入口复用的治理基线。
+`generate-governance` 是一个用于生成项目级 AI 协作治理文档的 skill。它面向 Claude Code, Codex, Gemini CLI, Kiro, Kimi Code 等 AI IDE / CLI 代理, 通过扫描目标代码库的语言、框架、依赖、配置和安全线索, 生成一套可审查、可追溯、可按工具入口复用的治理基线。
 
 这个项目解决的问题不是“生成一份通用说明文档”, 而是把一个项目中容易散落在口头约定、README、工具记忆和个人偏好里的 AI 协作规则, 收敛成三个明确分层的文件:
 
 - `constitution.md`: 项目最高优先级的安全红线、工作模式和行为边界。
 - `AGENTS.md`: 项目事实层, 保存目录、脚本、技术栈、拓扑和工具策略。
-- `{TOOL}.md`: 面向具体 AI 工具的入口文件, 例如 `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md`。
+- `{TOOL}.md`: 面向具体 AI 工具的入口文件, 例如 `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md`, `KIMI.md`。Kimi 目标额外生成原生桥接入口 `.kimi-code/AGENTS.md`。
 
 生成结果强调两点:
 
@@ -16,7 +16,7 @@
 ## 适用场景
 
 - 为新项目建立 AI 协作基线, 明确 AI 可以做什么、不能做什么、遇到生产风险时如何降级。
-- 为已有项目补齐或刷新 `constitution.md`, `AGENTS.md` 和工具入口文件, 在合并前先识别已有 `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md` 等文件, 降低不同 AI 工具之间的规则漂移。
+- 为已有项目补齐或刷新 `constitution.md`, `AGENTS.md` 和工具入口文件, 在合并前先识别已有 `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md`, `KIMI.md` 等文件, 降低不同 AI 工具之间的规则漂移。
 - 在团队中推广统一的 AI 使用规范, 把安全红线、事实来源、测试命令和工具能力边界写成可版本化文档。
 - 为数据库、部署、运维等高风险项目增加可恢复、可审计、低风险优先的操作约束。
 
@@ -33,7 +33,8 @@
 
 - **`constitution.md`** — 安全红线、工作模式与合规约束
 - **`AGENTS.md`** — 项目事实层：技术栈、架构、目录结构、依赖、脚本
-- **`{TOOL}.md`** — 工具入口文件（Claude Code / Gemini / Codex / Kiro）
+- **`{TOOL}.md`** — 工具入口文件（Claude Code / Gemini / Codex / Kiro / Kimi Code）
+- **`.kimi-code/AGENTS.md`** — 仅 Kimi 目标生成的原生桥接入口
 
 核心能力:
 
@@ -45,6 +46,7 @@
 - 按命中的治理维度选择模板, 并收集用户自定义红线。
 - 支持条件生成 MCP / skills 规则, 包括 Semble, TokenSave, Headroom, Context7, Fetch 以及部分文档和架构类 skills。
 - 生成前扫描目标项目已有治理文档和工具入口, 支持按文件选择合并、覆盖或跳过。
+- Kimi Code 使用完整 `KIMI.md` + 原生 `.kimi-code/AGENTS.md` 双入口, 两个文件分别确认处理策略。
 - 根据项目主语言注入语言专属编码规范模板, 未命中时降级到通用编码规范。
 
 ## 输出文件分层
@@ -54,13 +56,14 @@
 | `constitution.md` | 最高优先级安全红线、工作模式、证据纪律、生产操作边界 | 具体目录、脚本、领域知识手册 |
 | `AGENTS.md` | 项目事实、脚本命令、目录说明、服务拓扑、已确认环境能力 | 重复定义安全红线 |
 | `{TOOL}.md` | 某个 AI 工具的入口说明和工具专属行为 | 与其他工具共享的项目事实 |
+| `.kimi-code/AGENTS.md` | Kimi 原生加载到根治理文件的桥接 | 重复项目事实或 Kimi 专属能力正文 |
 
 这种分层让多个 AI 工具可以共用同一项目事实层, 同时保留各自入口文件的差异。
 
 ## 工作流
 
 ```
-项目代码 → 并行分析 (5 Agents) → 项目画像 → 检测结果确认 (现有文档+维度) → 环境能力确认 → 维度红线收集 → 模板填充 → 输出三件套
+项目代码 → 并行分析 (5 Agents) → 项目画像 → 检测结果确认 (现有文档+维度) → 环境能力确认 → 维度红线收集 → 模板填充 → 输出三件套 (Kimi 为四文件)
 ```
 
 ### Phase 1: 并行分析
@@ -114,7 +117,9 @@ templates/governance/
 │   ├── claude.md
 │   ├── gemini.md
 │   ├── codex.md
-│   └── kiro.md
+│   ├── kiro.md
+│   ├── kimi.md
+│   └── kimi-native-agents.md
 └── code-standards/        # 语言专属编码规范模板
     ├── generic.md
     ├── go.md
@@ -191,8 +196,9 @@ templates/governance/
 - **Gemini CLI** — 生成 `GEMINI.md`
 - **Codex (OpenAI)** — 生成 `CODEX.md`
 - **Kiro** — 生成 `KIRO.md`
+- **Kimi Code CLI** — 生成 `KIMI.md` 与 `.kimi-code/AGENTS.md`
 
-工具入口自动检测优先级: `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → 默认 Claude。
+工具入口自动检测优先级: `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → (`KIMI.md` 或 `.kimi-code/AGENTS.md`) → 默认 Claude。任一 Kimi 入口存在即识别为 Kimi; 两者同时存在只算一个工具入口。
 
 若目标项目已存在多个工具入口文件, 自动检测结果只作为推荐值; 生成前仍需要用户确认本次更新哪个入口文件。
 
@@ -206,6 +212,8 @@ templates/governance/
 - `GEMINI.md`
 - `CODEX.md`
 - `KIRO.md`
+- `KIMI.md`
+- `.kimi-code/AGENTS.md`
 
 对已存在文件支持三种策略:
 
@@ -216,6 +224,8 @@ templates/governance/
 | 跳过 | 保留现有文件, 不写入 |
 
 未确认策略的已有文件不会被写入。
+
+选择 Kimi 时, `KIMI.md` 与 `.kimi-code/AGENTS.md` 分别确认合并、覆盖或跳过; 其他工具仍只生成现有三件套。
 
 ## 使用
 
@@ -231,6 +241,7 @@ templates/governance/
 # 指定目标工具
 /generate-governance /path/to/project --tool codex
 /generate-governance . --tool gemini
+/generate-governance . --tool kimi
 ```
 
 ## 安装

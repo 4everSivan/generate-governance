@@ -327,6 +327,35 @@ function checkKimiExamples() {
   }
 }
 
+function checkKimiDocumentationContract() {
+  const readme = read('README.md')
+  for (const fragment of ['KIMI.md', '.kimi-code/AGENTS.md', '--tool kimi']) {
+    if (!readme.includes(fragment)) {
+      fail(`README missing Kimi documentation: ${fragment}`)
+    }
+  }
+
+  const reviewChecklist = read('docs/review-checklist.md')
+  for (const protectedFile of ['KIMI.md', '.kimi-code/AGENTS.md']) {
+    if (!reviewChecklist.includes(protectedFile)) {
+      fail(`Review checklist missing Kimi protected file: ${protectedFile}`)
+    }
+  }
+
+  const pkg = JSON.parse(read('package.json'))
+  const keywords = new Set(pkg.keywords ?? [])
+  for (const keyword of ['kimi', 'kimi-code']) {
+    if (!keywords.has(keyword)) {
+      fail(`package.json keywords missing Kimi keyword: ${keyword}`)
+    }
+  }
+
+  const changelog = read('CHANGELOG.md')
+  if (!changelog.includes('## [Unreleased]') || !changelog.includes('Kimi Code CLI')) {
+    fail('CHANGELOG missing unreleased Kimi Code CLI entry')
+  }
+}
+
 checkTemplateTokens()
 checkDimensionTemplates()
 checkToolEntryTemplates()
@@ -337,6 +366,7 @@ checkGitignore()
 checkPackageFiles()
 checkExamples()
 checkKimiExamples()
+checkKimiDocumentationContract()
 
 if (errors.length > 0) {
   console.error('Consistency check failed:')

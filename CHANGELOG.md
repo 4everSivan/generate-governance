@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- 新增 Kimi Code CLI 双入口支持: `KIMI.md` 保存完整工具专属规则, `.kimi-code/AGENTS.md` 提供原生桥接入口.
+- 新增 Kimi 入口自动检测与逐文件 merge/overwrite/skip 保护; 任一入口可识别 Kimi, 两者同时存在只计为一个工具.
+- 新增 Kimi 模板、静态一致性契约和多入口 fixture.
+
 ## [0.2.0] - 2026-07-02
 
 ### Added
