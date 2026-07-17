@@ -5,6 +5,7 @@ import path from 'node:path'
 
 const root = process.cwd()
 const errors = []
+const supportedToolEntries = ['claude', 'gemini', 'codex', 'kiro', 'kimi']
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8')
@@ -97,6 +98,45 @@ function checkDimensionTemplates() {
     }
     if (!exists(agents)) {
       fail(`Missing agents template for dimension: ${dimension}`)
+    }
+  }
+}
+
+function checkToolEntryTemplates() {
+  for (const tool of supportedToolEntries) {
+    const template = `templates/governance/tool-entry/${tool}.md`
+    if (!exists(template)) {
+      fail(`Missing tool entry template: ${tool}`)
+    }
+  }
+
+  const kimiTemplatePath = 'templates/governance/tool-entry/kimi.md'
+  if (exists(kimiTemplatePath)) {
+    const kimiTemplate = read(kimiTemplatePath)
+    const requiredKimiContent = [
+      '{{CAPABILITIES_SUMMARY}}',
+      '{{SKILLS_INDEX}}',
+      'explore',
+      'plan',
+      'coder',
+    ]
+    for (const content of requiredKimiContent) {
+      if (!kimiTemplate.includes(content)) {
+        fail(`Kimi tool entry template missing required content: ${content}`)
+      }
+    }
+  }
+
+  const nativeTemplatePath = 'templates/governance/tool-entry/kimi-native-agents.md'
+  if (!exists(nativeTemplatePath)) {
+    fail('Missing Kimi native AGENTS bridge template')
+    return
+  }
+
+  const nativeTemplate = read(nativeTemplatePath)
+  for (const governancePath of ['../constitution.md', '../AGENTS.md', '../KIMI.md']) {
+    if (!nativeTemplate.includes(governancePath)) {
+      fail(`Kimi native AGENTS bridge missing governance path: ${governancePath}`)
     }
   }
 }
@@ -233,6 +273,7 @@ function checkExamples() {
 
 checkTemplateTokens()
 checkDimensionTemplates()
+checkToolEntryTemplates()
 checkApiConfidenceEnums()
 checkAgentCount()
 checkGitignore()
