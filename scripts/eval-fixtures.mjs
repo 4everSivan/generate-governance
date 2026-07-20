@@ -323,6 +323,115 @@ function validateToolEntrySuite(directory, expected, suiteName) {
   }
 }
 
+const largeWorkTypes = new Set([
+  'greenfield',
+  'major-refactor',
+  'new-feature-module',
+  'public-contract-change',
+])
+
+function classifySkillRoute(input) {
+  const requestedWorkflows = Array.isArray(input.requested_workflows)
+    ? input.requested_workflows
+    : input.requested_workflow
+      ? [input.requested_workflow]
+      : []
+  const uniqueRequests = new Set(requestedWorkflows)
+
+  if (uniqueRequests.has('superpowers') && uniqueRequests.has('openspec')) {
+    return {
+      selected_workflow: 'none',
+      action: 'reject-workflow-conflict',
+      requires_confirmation: true,
+    }
+  }
+
+  let selectedWorkflow = requestedWorkflows[0]
+  if (!selectedWorkflow) {
+    const isLarge = input.size === 'large' || largeWorkTypes.has(input.work_type)
+    if (isLarge) {
+      selectedWorkflow = 'openspec'
+    } else if (input.work_type === 'bug' && input.diagnosis_required === true) {
+      selectedWorkflow = 'superpowers'
+    } else if (input.size === 'medium') {
+      selectedWorkflow = 'superpowers'
+    } else if (input.size === 'small' && input.ambiguous === true) {
+      selectedWorkflow = 'grill-me'
+    } else {
+      selectedWorkflow = 'direct'
+    }
+  }
+
+  if (input.previous_workflow === 'grill-me' && ['superpowers', 'openspec'].includes(selectedWorkflow)) {
+    return {
+      selected_workflow: selectedWorkflow,
+      action: 'request-workflow-switch',
+      requires_confirmation: true,
+    }
+  }
+
+  if (selectedWorkflow === 'grill-me') {
+    const explicitlyRequested = requestedWorkflows.includes('grill-me')
+    return {
+      selected_workflow: 'grill-me',
+      action: explicitlyRequested || input.grill_me_confirmed === true
+        ? 'start-grill-me'
+        : 'request-grill-me-confirmation',
+      requires_confirmation: !explicitlyRequested && input.grill_me_confirmed !== true,
+    }
+  }
+
+  if (selectedWorkflow === 'openspec') {
+    if (input.openspec_available !== true) {
+      return {
+        selected_workflow: 'openspec',
+        action: 'request-openspec-installation',
+        requires_confirmation: true,
+      }
+    }
+    if (input.openspec_initialized !== true) {
+      return {
+        selected_workflow: 'openspec',
+        action: 'request-openspec-initialization',
+        requires_confirmation: true,
+      }
+    }
+    return {
+      selected_workflow: 'openspec',
+      action: 'start-openspec',
+      requires_confirmation: false,
+    }
+  }
+
+  if (selectedWorkflow === 'superpowers') {
+    return {
+      selected_workflow: 'superpowers',
+      action: 'start-superpowers',
+      requires_confirmation: false,
+    }
+  }
+
+  return {
+    selected_workflow: 'direct',
+    action: 'execute-directly',
+    requires_confirmation: false,
+  }
+}
+
+function validateSkillRoutingSuite(expected, suiteName) {
+  if (!requireObject(expected.cases, `${suiteName}.cases`)) return
+
+  for (const [caseName, expectedCase] of Object.entries(expected.cases)) {
+    const casePath = `${suiteName}.cases.${caseName}`
+    if (!requireObject(expectedCase, casePath)) continue
+    if (!requireObject(expectedCase.input, `${casePath}.input`)) continue
+    if (!requireObject(expectedCase.expected, `${casePath}.expected`)) continue
+
+    const observation = classifySkillRoute(expectedCase.input)
+    compare(observation, expectedCase.expected, `${casePath}.expected`)
+  }
+}
+
 const suites = fs.readdirSync(examplesRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
@@ -346,6 +455,9 @@ for (const suiteName of suites) {
   } else if (expected.kind === 'tool-entry-cases') {
     scenarioCount += isObject(expected.cases) ? Object.keys(expected.cases).length : 0
     validateToolEntrySuite(directory, expected, suiteName)
+  } else if (expected.kind === 'skill-routing-cases') {
+    scenarioCount += isObject(expected.cases) ? Object.keys(expected.cases).length : 0
+    validateSkillRoutingSuite(expected, suiteName)
   } else {
     fail(`${suiteName}.kind`, `unsupported fixture kind ${JSON.stringify(expected.kind)}`)
   }

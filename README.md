@@ -186,7 +186,9 @@ templates/governance/
 | MCP | `context7` | 第三方库/API/CLI/云服务文档查询 |
 | MCP | `fetch` | 外部 URL 和官方资料获取 |
 | Skill | `improve-codebase-architecture` | 架构改进, 解耦, 可测试性分析 |
-| Skill | `brainstorming` | 复杂/创造性变更前收敛设计 |
+| Skill suite | Superpowers | 原因未知的 bug 与中型任务; 进入后遵循完整原生链路 |
+| Skill | `grill-me` | 小型歧义任务的可选澄清, 每次使用前确认 |
+| Workflow | OpenSpec / OPSX | 大型重构, 从 0 构建, 新功能模块与系统契约变化; 与 Superpowers 互斥 |
 | Skill | 文档类 skills | Word/PDF/表格/演示文稿生成与视觉验证 |
 | Skill | `pua` | 失败多次后的换路恢复, 仅用户明确确认时生成 |
 

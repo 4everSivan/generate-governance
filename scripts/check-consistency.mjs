@@ -505,6 +505,51 @@ function checkConsolidatedConfirmationContract() {
   }
 }
 
+function checkWorkflowSkillRoutingContract() {
+  const skillMd = read('SKILL.md')
+  const agents = read('templates/governance/agents/base.md')
+  const readme = read('README.md')
+  const checklist = read('docs/review-checklist.md')
+
+  for (const token of [
+    'has_skill_superpowers',
+    'has_skill_grill_me',
+    'has_workflow_openspec',
+  ]) {
+    if (!skillMd.includes(`{{#${token}}}`) || !agents.includes(`{{#${token}}}`)) {
+      fail(`Workflow skill routing token is not declared and used: ${token}`)
+    }
+  }
+
+  const requiredAgentFragments = [
+    '小型任务不得因 Superpowers 可用而自动进入',
+    '完整遵循已安装版本的内部 skill 规则与后续调用',
+    '开始 `grill-me` 前必须获得用户明确确认',
+    'Superpowers 与 OpenSpec 互斥',
+    'OpenSpec 任务不得调用任何 Superpowers skill',
+    '用户同时要求两者时停止, 不预选其中之一, 并要求用户二选一',
+    '不得自动安装或初始化',
+    '不得静默切换到 Superpowers',
+  ]
+  for (const fragment of requiredAgentFragments) {
+    if (!agents.includes(fragment)) {
+      fail(`AGENTS template missing workflow skill routing safeguard: ${fragment}`)
+    }
+  }
+
+  if (agents.includes('{{#has_skill_brainstorming}}')) {
+    fail('AGENTS template still has standalone brainstorming routing that can bypass scenario classification')
+  }
+  for (const fragment of ['Superpowers', '`grill-me`', 'OpenSpec / OPSX']) {
+    if (!readme.includes(fragment)) {
+      fail(`README missing workflow skill routing capability: ${fragment}`)
+    }
+  }
+  if (!checklist.includes('Superpowers and OpenSpec must remain mutually exclusive')) {
+    fail('Review checklist missing Superpowers/OpenSpec mutual-exclusion guard')
+  }
+}
+
 checkTemplateTokens()
 checkTemplateTokenSources()
 checkProfileTokenSources()
@@ -521,6 +566,7 @@ checkKimiDocumentationContract()
 checkInstructionHierarchy()
 checkReadmeVersion()
 checkConsolidatedConfirmationContract()
+checkWorkflowSkillRoutingContract()
 
 if (errors.length > 0) {
   console.error('Consistency check failed:')

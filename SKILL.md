@@ -116,20 +116,29 @@ subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 p
 | `context7` | 第三方库/API/CLI/云服务文档查询 |
 | `fetch` | 外部 URL 与官方资料获取 |
 
-检测候选 skills:
+检测候选 skills 与工作流能力:
 
 | 能力 | 规则用途 |
 |------|----------|
 | `improve-codebase-architecture` | 架构改进, 解耦, 可测试性分析 |
-| `brainstorming` | 复杂或创造性变更前收敛设计 |
+| Superpowers skill suite | 原因未知的 bug 与中型任务; 进入后遵循其完整内部 skill 链路 |
+| `grill-me` | 小型但有歧义的任务; 每次使用前取得用户明确确认 |
+| OpenSpec / OPSX | 大型重构, 从 0 构建, 新功能模块与系统契约变化 |
 | `documents` / `pdf` / `spreadsheets` / `presentations` | 文档, PDF, 表格, 演示文稿生成与视觉验证 |
 | `pua` | 失败多次后的强制换路与穷尽方案, 仅用户明确确认时写入 |
+
+检测规则:
+
+- **Superpowers**: 按已注册 suite/plugin 元数据, 或 `using-superpowers` 与其引用的实际成员 skills 检测; 记录已发现成员. 只有 `brainstorming` 不得被视为完整 Superpowers. 未检测到完整 suite 时不得生成完整工作流规则.
+- **`grill-me`**: 按精确名称或命名空间等价名称检测.
+- **OpenSpec**: 分别记录 `openspec` CLI 是否可用与目标项目是否已初始化 (`openspec/config.yaml`, `openspec/` 工作区或已生成 OPSX skills). 不得把 CLI 已安装等同于项目已初始化.
 
 能力状态必须区分:
 
 - `available`: 当前环境检测到.
 - `confirmed`: 用户确认写入生成规范.
 - `skipped`: 未检测到或用户选择不写入.
+- `details`: 对 suite/工作流记录成员 skills, CLI 版本和初始化状态等已验证事实; 不得补造缺失成员或命令.
 
 文件策略语义:
 
@@ -162,7 +171,7 @@ options:
 tool: codex
 files: constitution.md=merge, AGENTS.md=merge, CODEX.md=overwrite
 dimensions: +api, -maintenance
-capabilities: semble, brainstorming
+capabilities: semble, superpowers, grill-me, openspec
 redlines.database:
 - 禁止生产环境执行未审查 DDL
 ```
@@ -173,7 +182,7 @@ redlines.database:
 
 确认后得到最终 `tool`, `file_strategies`, `confirmed_dimensions`, `confirmed_capabilities`, `user_redlines`. 选择取消则不写任何文件.
 
-**红线:** 未确认不得写入; 已存在文件必须有策略; 多工具入口不得静默选择; Kimi 两个文件分别记录策略; 弱证据维度不得静默启用; 未检测或未确认的能力不得写成项目强制规则.
+**红线:** 未确认不得写入; 已存在文件必须有策略; 多工具入口不得静默选择; Kimi 两个文件分别记录策略; 弱证据维度不得静默启用; 未检测或未确认的能力不得写成项目强制规则; Superpowers 与 OpenSpec 不得在同一任务中交叉使用.
 
 ## Phase 3: 模板填充与生成
 
@@ -285,7 +294,9 @@ API 维度影响优先级:
 - `{{#has_mcp_context7}}...{{/has_mcp_context7}}` — 检测到并经用户确认 `context7` 时展开
 - `{{#has_mcp_fetch}}...{{/has_mcp_fetch}}` — 检测到并经用户确认 `fetch` 时展开
 - `{{#has_skill_architecture}}...{{/has_skill_architecture}}` — 检测到并经用户确认架构改进 skill 时展开
-- `{{#has_skill_brainstorming}}...{{/has_skill_brainstorming}}` — 检测到并经用户确认 brainstorming skill 时展开
+- `{{#has_skill_superpowers}}...{{/has_skill_superpowers}}` — 检测到并经用户确认完整 Superpowers suite 时展开
+- `{{#has_skill_grill_me}}...{{/has_skill_grill_me}}` — 检测到并经用户确认 `grill-me` 时展开
+- `{{#has_workflow_openspec}}...{{/has_workflow_openspec}}` — 检测到并经用户确认 OpenSpec/OPSX 时展开
 - `{{#has_skill_artifacts}}...{{/has_skill_artifacts}}` — 检测到并经用户确认文档/表格/演示/PDF 类 skill 时展开
 - `{{#has_skill_pua}}...{{/has_skill_pua}}` — 检测到并经用户明确确认 `pua` skill 时展开
 

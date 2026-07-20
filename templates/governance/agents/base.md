@@ -149,13 +149,34 @@
 <!-- source: capability-detect/skill-architecture, confirmed: true -->
 {{/has_skill_architecture}}
 
-{{#has_skill_brainstorming}}
-### Brainstorming Skill
+{{#has_skill_superpowers}}
+### Superpowers 工作流
 
-- **[默认] 复杂/创造性变更前使用**: 新功能, 行为设计, 大范围交互变化或不确定需求先使用 brainstorming 收敛目标, 约束和成功标准.
-- **[强制] 小改动不过度流程化**: 明确的小 bugfix, 文案调整, 配置修正和机械性改动不因该 skill 存在而强制进入完整设计流程.
-<!-- source: capability-detect/skill-brainstorming, confirmed: true -->
-{{/has_skill_brainstorming}}
+- **[强制] 场景入口**: 原因未知且需要复现或根因诊断的 bug, 以及边界稳定但需要多步骤实施的中型任务, 进入 Superpowers.
+- **[强制] 小型任务不自动进入**: 目标与修法明确, 局部, 低风险且容易回滚的小型任务直接执行; 小型任务不得因 Superpowers 可用而自动进入.
+- **[强制] 遵循原生链路**: 一旦选择 Superpowers, 完整遵循已安装版本的内部 skill 规则与后续调用, 不施加“最小 skill 集”限制.
+- **[红线] 禁止与 OpenSpec 交叉**: Superpowers 与 OpenSpec 互斥; Superpowers 任务不得调用 OpenSpec, 也不得在执行中切换为 OpenSpec. 用户同时要求两者时停止, 不预选其中之一, 并要求用户二选一.
+<!-- source: capability-detect/skill-superpowers, confirmed: true -->
+{{/has_skill_superpowers}}
+
+{{#has_skill_grill_me}}
+### Grill-me 需求澄清
+
+- **[默认] 仅用于小型歧义任务**: 小型任务存在需求歧义, 取舍或验收标准不清时, 可建议使用 `grill-me`; 明确的小型任务直接执行.
+- **[强制] 任务级确认**: 开始 `grill-me` 前必须获得用户明确确认; 用户在当前请求中明确指定 `grill-me` 视为已确认.
+- **[强制] 重新分类后停止**: 访谈发现任务实际属于中型或大型时, 结束 `grill-me`, 报告重新分类并取得确认后再进入相应工作流.
+<!-- source: capability-detect/skill-grill-me, confirmed: true -->
+{{/has_skill_grill_me}}
+
+{{#has_workflow_openspec}}
+### OpenSpec / OPSX 工作流
+
+- **[强制] 大型任务入口**: 大型重构, 从 0 构建, 新功能模块, 公共 API/数据模型/跨模块边界变化或需要跨会话维护规格的任务使用 OpenSpec. 按影响形态判断, 不按文件数或代码行数判断.
+- **[强制] 独立工作流**: 进入 OpenSpec 后使用 OPSX 管理规格, 设计, 任务, 实施与归档; Superpowers 与 OpenSpec 互斥, OpenSpec 任务不得调用任何 Superpowers skill.
+- **[强制] 安装与初始化需授权**: 未安装时只提出安装建议; 已安装但项目未初始化时, 执行 `openspec init` 前先取得用户确认; 不得自动安装或初始化.
+- **[强制] 不静默降级**: 用户拒绝安装或初始化时, 再确认是改用非 OpenSpec 路径还是取消; 不得静默切换到 Superpowers.
+<!-- source: capability-detect/workflow-openspec, confirmed: true -->
+{{/has_workflow_openspec}}
 
 {{#has_skill_artifacts}}
 ### 文档与制品 Skills

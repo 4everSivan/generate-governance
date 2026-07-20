@@ -42,6 +42,9 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 - MCP and skill rules may be generated only when the capability is detected and confirmed by the user.
 - Missing capabilities must not become project requirements.
 - Capability rules should describe use boundaries and fallback behavior.
+- Clear small tasks must not automatically enter Superpowers; `grill-me` requires task-level confirmation.
+- Superpowers and OpenSpec must remain mutually exclusive; neither workflow may invoke the other.
+- OpenSpec installation and initialization require explicit approval and must not silently fall back.
 
 ## Language Standards
 
@@ -58,6 +61,7 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 | Consolidated confirmation | SKILL Phase 2 | `checkConsolidatedConfirmationContract` + fixture governance expectations | Remove repeated prompts, not existing-file or ambiguity gates |
 | Kimi dual entry | SKILL + Kimi templates | `checkKimiSkillContract`, Kimi fixture cases | Share tool detection; preserve per-file strategies and failure reporting |
 | Shared capabilities | AGENTS template | `checkToolEntryTemplates` | Keep one shared source; tool entries only reference it |
+| Workflow skill routing | SKILL + AGENTS template | `checkWorkflowSkillRoutingContract` + routing fixture cases | Route only Superpowers, `grill-me`, and OpenSpec; preserve mutual exclusion |
 | Dimension and evidence rules | Workflow prompts + SKILL fallback scan | `eval-fixtures.mjs` | Offline eval checks deterministic evidence only, not model quality |
 | Unique safety rules | constitution and dimension templates | Human review in this checklist | Keep until behavioral evaluation supports removal |
 

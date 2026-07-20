@@ -1,0 +1,69 @@
+{
+  "kind": "skill-routing-cases",
+  "cases": {
+    "small-clear-change": {
+      "input": { "size": "small", "work_type": "change", "ambiguous": false },
+      "expected": { "selected_workflow": "direct", "action": "execute-directly", "requires_confirmation": false }
+    },
+    "small-ambiguous-unconfirmed": {
+      "input": { "size": "small", "work_type": "change", "ambiguous": true, "grill_me_confirmed": false },
+      "expected": { "selected_workflow": "grill-me", "action": "request-grill-me-confirmation", "requires_confirmation": true }
+    },
+    "small-ambiguous-confirmed": {
+      "input": { "size": "small", "work_type": "change", "ambiguous": true, "grill_me_confirmed": true },
+      "expected": { "selected_workflow": "grill-me", "action": "start-grill-me", "requires_confirmation": false }
+    },
+    "small-trivial-bug": {
+      "input": { "size": "small", "work_type": "bug", "diagnosis_required": false },
+      "expected": { "selected_workflow": "direct", "action": "execute-directly", "requires_confirmation": false }
+    },
+    "diagnostic-bug": {
+      "input": { "size": "small", "work_type": "bug", "diagnosis_required": true },
+      "expected": { "selected_workflow": "superpowers", "action": "start-superpowers", "requires_confirmation": false }
+    },
+    "medium-existing-module": {
+      "input": { "size": "medium", "work_type": "change" },
+      "expected": { "selected_workflow": "superpowers", "action": "start-superpowers", "requires_confirmation": false }
+    },
+    "major-refactor": {
+      "input": { "size": "large", "work_type": "major-refactor", "openspec_available": true, "openspec_initialized": true },
+      "expected": { "selected_workflow": "openspec", "action": "start-openspec", "requires_confirmation": false }
+    },
+    "greenfield-build": {
+      "input": { "size": "large", "work_type": "greenfield", "openspec_available": true, "openspec_initialized": true },
+      "expected": { "selected_workflow": "openspec", "action": "start-openspec", "requires_confirmation": false }
+    },
+    "new-feature-module": {
+      "input": { "size": "large", "work_type": "new-feature-module", "openspec_available": true, "openspec_initialized": true },
+      "expected": { "selected_workflow": "openspec", "action": "start-openspec", "requires_confirmation": false }
+    },
+    "public-contract-change": {
+      "input": { "size": "large", "work_type": "public-contract-change", "openspec_available": true, "openspec_initialized": true },
+      "expected": { "selected_workflow": "openspec", "action": "start-openspec", "requires_confirmation": false }
+    },
+    "openspec-not-installed": {
+      "input": { "size": "large", "work_type": "major-refactor", "openspec_available": false, "openspec_initialized": false },
+      "expected": { "selected_workflow": "openspec", "action": "request-openspec-installation", "requires_confirmation": true }
+    },
+    "openspec-not-initialized": {
+      "input": { "size": "large", "work_type": "major-refactor", "openspec_available": true, "openspec_initialized": false },
+      "expected": { "selected_workflow": "openspec", "action": "request-openspec-initialization", "requires_confirmation": true }
+    },
+    "explicit-small-superpowers": {
+      "input": { "size": "small", "work_type": "change", "requested_workflow": "superpowers" },
+      "expected": { "selected_workflow": "superpowers", "action": "start-superpowers", "requires_confirmation": false }
+    },
+    "explicit-grill-me": {
+      "input": { "size": "small", "work_type": "change", "requested_workflow": "grill-me" },
+      "expected": { "selected_workflow": "grill-me", "action": "start-grill-me", "requires_confirmation": false }
+    },
+    "grill-me-reclassifies-medium": {
+      "input": { "size": "medium", "work_type": "change", "previous_workflow": "grill-me" },
+      "expected": { "selected_workflow": "superpowers", "action": "request-workflow-switch", "requires_confirmation": true }
+    },
+    "explicit-workflow-conflict": {
+      "input": { "size": "large", "work_type": "major-refactor", "requested_workflows": ["superpowers", "openspec"] },
+      "expected": { "selected_workflow": "none", "action": "reject-workflow-conflict", "requires_confirmation": true }
+    }
+  }
+}
