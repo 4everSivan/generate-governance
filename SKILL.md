@@ -25,7 +25,7 @@ allowed-tools:
 
 - `$ARGUMENTS` — `[target-path] [--tool claude|gemini|codex|kiro|kimi]`
 - target-path 默认为当前路径 (`.`); 无法识别为项目时提示用户指定.
-- `--tool` 指定目标工具入口; 未指定时根据项目现有入口文件自动检测 (检测顺序: CLAUDE.md → GEMINI.md → CODEX.md → KIRO.md → KIMI.md 或 .kimi-code/AGENTS.md → 默认 claude).
+- `--tool` 指定目标工具入口; 未指定时由 Phase 2 按现有入口提出建议.
 
 ## Phase 1: 项目分析
 
@@ -36,7 +36,7 @@ allowed-tools:
 - **Claude Code 路径 (Phase 1-C)**: 若当前环境提供 `Workflow` 工具, 走此路径. 用 `workflow-analyze.js` 并行 5 agent 分析, 产出结构化 project profile JSON, 交互用 `AskUserQuestion`.
 - **Codex 降级路径 (Phase 1-D)**: 若无 `Workflow` 工具 (Codex 等环境), 走此路径. 用 Grep/Glob/Read 指令式扫描目标项目, 复杂维度可选派 subagent 深入, 自行组装与 Claude Code 路径结构一致的 project profile JSON, 交互用纯文本提问.
 
-两条路径产出的 project profile JSON 结构必须一致 (字段名, 嵌套, enum 值对齐 `workflow-analyze.js` 的 SUMMARIZE_SCHEMA), 以保证后续 Phase 2-5 模板填充无差异.
+两条路径产出的 project profile JSON 结构必须一致 (字段名, 嵌套, enum 值对齐 `workflow-analyze.js` 的 SUMMARIZE_SCHEMA), 以保证后续确认和模板填充无差异.
 
 1. 确认 target-path 存在且包含可识别项目特征 (go.mod / package.json / Cargo.toml / requirements.txt / Makefile / src/ 等).
 2. 若不满足, 提示用户并询问是否继续最小生成.
@@ -82,73 +82,29 @@ subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 p
 按 `workflow-analyze.js` 的 SUMMARIZE_SCHEMA 结构组装:
 
 - `project_name`: 目标目录名, 或 manifest 的 name 字段.
-- `language` / `framework`: 从语言与构建扫描得出.
+- `language` / `framework` / `build_system` / `entry_points` / `arch_pattern`: 从代码结构扫描得出; 无证据时使用空数组或 `unknown`, 不补造.
 - `domain`: 用中文描述项目领域 (具体优于泛化, "电商后端服务" 优于 "后端服务").
 - `role`: 中文专家角色, 模式 "精通 {language} 的 {domain_specialist}".
 - `priorities`: 有序优先级列表. 命中 database+api → `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度`; 命中 api 无 database → `API 安全与契约兼容 > ...`; 非 DB 非 API → `服务可用性 > ...`. **不得仅因缺 auth entrypoints 推断 internal API 并降级** (对齐 review-checklist:27); 缺 auth 证据标注 "auth 未检测, 风险未知".
 - `dimensions`: code 总是命中; database (db_driver 依赖或迁移脚本); api (路由/控制器/契约/框架/测试证据); deploy (Dockerfile/k8s/Terraform/CI); maintenance (监控/告警配置). api 缺 auth 证据标 LOW confidence.
 - `scope`: 关键技术逗号分隔列表.
+- `deps_summary` / `scripts_summary` / `dirs_summary` / `security_summary`: 分别从依赖, 配置, 目录和安全扫描压缩得出; 缺失项保留空集合或显式 unknown.
 - `api_summary`: { frameworks, route_paths, schema_files, auth_entrypoints, test_paths, evidence, confidence }.
-- `confidence`: { language, framework, arch_pattern, dimensions, api } 各 HIGH/MEDIUM/LOW.
+- `deployment_summary`: { has_dockerfile, has_docker_compose, has_k8s, has_terraform, ci_pipeline, description, evidence, confidence }.
+- `maintenance_summary`: { log_locations, monitoring_tools, alert_configs, evidence, confidence }.
+- `confidence`: { language, framework, arch_pattern, dimensions, api } 各 HIGH/MEDIUM/LOW/UNKNOWN.
 
-组装后进入 Phase 2 (用 Codex 降级交互, 见各 Phase 的 Codex 文本提问说明).
+组装后进入 Phase 2; 无结构化提问工具时使用该阶段的 Codex 文本交互.
 
-## Phase 2: 第一轮交互 — 检测结果确认 (现有文档与维度)
+## Phase 2: 建议设置确认
 
-将现有治理文档与项目画像的检测结果**一次性**呈现给用户, 避免分多轮确认. 呈现内容:
+分析后构造单一 `proposed_settings`, 一次呈现并确认生成配置. 它包含:
 
-- **现有治理文档扫描**: 检测 `constitution.md` / `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `CODEX.md` / `KIRO.md` / `KIMI.md` / `.kimi-code/AGENTS.md` 是否存在, 每个文件是否含 `<!-- user-custom -->...<!-- /user-custom -->` 可保留区, 以及提议的处理策略 (默认: 合并).
-- **工具入口**: 自动检测顺序 `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → (`KIMI.md` 或 `.kimi-code/AGENTS.md`) → 默认 `claude`. `KIMI.md` 或 `.kimi-code/AGENTS.md` 任一存在即识别为 Kimi; 两者同时存在只计为一个工具入口. 若多个不同工具入口同时存在, 必须提示用户选择本次生成/更新的工具.
-- **项目画像摘要**: 语言, 框架, 构建系统; 数据库/API/部署/监控特征; 命中维度 (code 总是命中; database/api/deploy/maintenance 条件命中).
-- **关联提示**: 若检测到已有 `constitution.md`, 标注"建议维度与现有 constitution 对齐", 避免用户因信息分批呈现而忽略文档与维度的关联.
-
-使用 AskUserQuestion 提问:
-
-```
-header: "检测结果确认"
-question: "检测结果与处理策略是否准确? 需要调整吗?"
-options:
-  - label: "全部确认"
-    description: "按提议策略继续 (现有文档合并, 维度按检测结果)"
-  - label: "我要调整"
-    description: "调整文档处理策略或增减维度"
-```
-
-**Codex 降级路径交互**: 若无 `AskUserQuestion` 工具, 将上述检测结果 (现有文档 + 工具入口 + 画像摘要 + 命中维度 + 提议策略) 以列表形式呈现, 然后纯文本提问:
-
-"以上检测结果与处理策略是否准确? 回复 '确认' 按提议继续, 或回复具体修正 (文档策略 merge/overwrite/skip + 维度增减, 如 'CLAUDE.md: skip; + api')."
-
-等待用户文本回复, 解析后更新文件级策略映射与 `confirmed_dimensions`. 红线不变: 未确认不覆盖已有文档, 多工具入口不静默覆盖.
-
-若用户选择 "我要调整", 通过一次文本收集所有修正, 同时覆盖文档策略与维度:
-
-```text
-# 文档策略 (merge/overwrite/skip, 未列出的文件按提议默认)
-constitution.md: merge
-AGENTS.md: merge
-CLAUDE.md: skip
-CODEX.md: overwrite
-KIMI.md: merge
-.kimi-code/AGENTS.md: skip
-
-# 维度修正 (增/删维度, 或修正检测结果)
-+ api
-- maintenance
-```
-
-更新 `confirmed_dimensions` 与文件级策略映射. 文档策略语义:
-
-- **合并**: 保留旧文件 `<!-- user-custom -->...<!-- /user-custom -->` 区块, 更新其余生成内容.
-- **覆盖**: 备份到 `.governance-backup/` 后重写.
-- **跳过**: 保留现有文件, 不写入对应文件.
-
-**红线:** 未经用户确认, 不得覆盖或重写目标项目中已存在的 `constitution.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `CODEX.md`, `KIRO.md`, `KIMI.md`, `.kimi-code/AGENTS.md`; 多工具入口不得静默覆盖. Kimi 的两个入口必须分别记录文件级策略.
-
-## Phase 3: 第二轮交互 — 环境能力检测与确认
-
-检测当前 agent 环境中可用的 MCP 服务与 skills, 仅将**检测到且用户确认启用**的能力写入生成文档.
-
-### 3.1 能力检测
+- `tool`: 按 `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → (`KIMI.md` 或 `.kimi-code/AGENTS.md`) → 默认 `claude` 推荐. Kimi 双入口算一个工具; 多个不同工具并存时标记为未决选择.
+- `file_strategies`: 扫描 `constitution.md`, `AGENTS.md`, 所有工具入口及 `user-custom` 区块; 已存在文件默认建议 merge, 新文件标记 create.
+- `confirmed_dimensions`: 展示每个维度的证据与 confidence; code 始终命中, 弱证据维度必须显式标注.
+- `confirmed_capabilities`: 只列出当前环境检测到的 MCP/skills 及将启用的规则; 接受建议即确认这些能力.
+- `user_redlines`: 展示模板基线红线; 默认无额外用户红线, 可在调整时按维度补充.
 
 检测候选 MCP 服务:
 
@@ -169,80 +125,59 @@ KIMI.md: merge
 | `documents` / `pdf` / `spreadsheets` / `presentations` | 文档, PDF, 表格, 演示文稿生成与视觉验证 |
 | `pua` | 失败多次后的强制换路与穷尽方案, 仅用户明确确认时写入 |
 
-检测结果必须区分:
+能力状态必须区分:
 
 - `available`: 当前环境检测到.
 - `confirmed`: 用户确认写入生成规范.
 - `skipped`: 未检测到或用户选择不写入.
 
-### 3.2 用户确认
+文件策略语义:
 
-将能力检测结果呈现给用户:
+- **merge**: 保留旧文件 `<!-- user-custom -->...<!-- /user-custom -->` 区块, 更新其余生成内容; 标记外用户文本先警告.
+- **overwrite**: 备份到 `.governance-backup/` 后重写.
+- **skip**: 保留现有文件, 不写入.
+- **create**: 仅用于不存在的目标文件.
 
-- 检测到的 MCP 服务.
-- 检测到的 skills.
-- 每项能力将生成的规则摘要.
-- 未检测到的候选能力不生成对应强制规则.
+将项目画像与 confidence, 维度证据, 文件策略, 工具入口, 能力规则摘要, 基线红线和待确认项放在同一消息中. 若已有 `constitution.md`, 同时提示维度应与现有项目治理对齐.
 
-使用 AskUserQuestion 提问:
+无未决必选项时使用 AskUserQuestion:
 
 ```
-header: "能力确认"
-question: "是否将检测到的 MCP / skills 能力写入项目治理规范?"
+header: "生成设置"
+question: "是否按以上建议设置生成治理文档?"
 options:
-  - label: "确认全部"
-    description: "将检测到的候选能力全部写入"
-  - label: "选择部分"
-    description: "我指定哪些能力写入"
-  - label: "全部跳过"
-    description: "不生成环境能力规则"
+  - label: "按建议生成"
+    description: "确认展示的工具, 文件策略, 维度, 能力和基线红线"
+  - label: "调整"
+    description: "一次性修正工具, 文件策略, 维度, 能力或自定义红线"
+  - label: "取消"
+    description: "不写入任何文件"
 ```
 
-**Codex 降级路径交互**: 若无 `AskUserQuestion` 工具, 呈现检测到的 MCP/skills 及每项将生成的规则摘要, 然后纯文本提问:
+多个不同工具入口并存等未决必选项存在时, 不提供可直接写入的"按建议生成"; 改为"补充选择"或"取消", 并只收集未决字段.
 
-"是否将检测到的能力写入治理规范? 回复 '全部' / '部分: <能力列表>' / '跳过'."
+选择"调整"时一次性收集结构化修正; 未列出的字段沿用已展示建议:
 
-等待用户文本回复, 解析后更新 `confirmed_capabilities`. 红线不变: 未检测到的能力不写强制规则, 未确认不写入特定 MCP/skill 依赖.
-
-若用户选择 "选择部分", 通过文本收集确认列表, 更新 `confirmed_capabilities`.
-
-**红线:** 不得把当前环境未检测到的 MCP/skill 写成项目强制规则; 不得在用户未确认时写入特定 MCP/skill 依赖.
-
-## Phase 4: 第三轮交互 — 领域红线收集
-
-对每个命中维度, 使用 AskUserQuestion 收集用户特定红线:
-
-```
-header: "{dim}红线"
-question: "请补充 {dim_name} 维度的安全红线 (每条一行, 无则回复 '无')"
-multiSelect: false
+```text
+tool: codex
+files: constitution.md=merge, AGENTS.md=merge, CODEX.md=overwrite
+dimensions: +api, -maintenance
+capabilities: semble, brainstorming
+redlines.database:
+- 禁止生产环境执行未审查 DDL
 ```
 
-**Codex 降级路径交互**: 若无 `AskUserQuestion` 工具, 按命中维度逐块呈现示例红线 (见下表), 然后纯文本提问:
+只有以下情况允许追加提问: 调整回复缺少必选字段; 多工具入口仍未选择; 已存在文件仍无策略. 追加问题只询问缺失字段, 不重复已确认内容.
 
-"请补充各命中维度的安全红线, 每条一行, 无则回复 '无'. 格式:
-database:
-- 禁止...
-api:
-- 禁止..."
+**Codex 降级路径交互**: 若无 `AskUserQuestion`, 输出同一建议设置摘要并要求回复 `按建议生成` / `调整: <结构化修正>` / `取消`. 多工具入口未决时要求在调整中指定 `tool`.
 
-等待用户文本回复, 按维度解析填入对应 `{{USER_REDLINES_*}}` 占位符. 通用基线红线自动填充, 不询问.
+确认后得到最终 `tool`, `file_strategies`, `confirmed_dimensions`, `confirmed_capabilities`, `user_redlines`. 选择取消则不写任何文件.
 
-维度与示例:
+**红线:** 未确认不得写入; 已存在文件必须有策略; 多工具入口不得静默选择; Kimi 两个文件分别记录策略; 弱证据维度不得静默启用; 未检测或未确认的能力不得写成项目强制规则.
 
-| 维度 | 维度名 | 示例红线 |
-|------|--------|---------|
-| dim-database | 数据库 | 禁止无备份 DDL; 禁止生产环境 DROP TABLE |
-| dim-api | API | 禁止未审计公开 API; 禁止响应泄露敏感字段 |
-| dim-deploy | 部署 | 禁止绕过 CI 部署生产; 金丝雀发布强制等待 5 分钟 |
-| dim-maintenance | 运维 | 禁止无告警变更; 变更窗口 02:00-06:00 |
-| dim-code | 代码质量 | 禁止跳过 review 合并主干; 覆盖率不得低于 80% |
+## Phase 3: 模板填充与生成
 
-通用基线红线 (不伪造事实, 基于证据表达, 最小权限等) 自动填充, 不询问.
-
-## Phase 5: 模板填充与生成
-
-### 5.1 模板选择
+### 3.1 模板选择
 
 根据命中的维度, 读取对应模板文件:
 
@@ -267,17 +202,7 @@ api:
 
 若项目已有更具体的语言规范文档或 formatter/linter 配置, 语言模板只能作为补充, 不得覆盖项目现有规范.
 
-API 维度在已有代码项目中自动检测, 但必须由用户确认后启用:
-
-| 证据类型 | 示例 |
-|----------|------|
-| API 框架 | Express, Fastify, NestJS, Next.js API routes, Gin, Echo, Fiber, FastAPI, Django REST Framework, Flask, Spring Web, Actix Web, Axum |
-| 路由结构 | `routes/`, `controllers/`, `handlers/`, `api/`, `endpoints/`, `app/api/`, `pages/api/` |
-| 契约文件 | `openapi.yaml`, `openapi.yml`, `swagger.json`, `schema.graphql`, `*.proto`, `asyncapi.yaml` |
-| 测试线索 | API, integration, e2e, contract, handler, controller tests |
-| 网关/生成工具 | Kong, Envoy, grpc-gateway, OpenAPI generator |
-
-若仅检测到 SDK client 或含义不明的 `api/` 目录, `api` 维度必须标记为 LOW confidence 并等待用户确认.
+API 维度使用 Phase 1 的框架, 路由, 契约, 测试与网关证据; 仅检测到 SDK client 或含义不明的 `api/` 目录时标记 LOW confidence, 在 Phase 2 等待确认.
 
 API 维度影响优先级:
 
@@ -287,61 +212,61 @@ API 维度影响优先级:
 
 不得仅因缺少 auth entrypoints 就推断为内部 API 并降级优先级; 缺少 auth 证据是不确定性与风险, 应在画像中标注 "auth 未检测, 风险未知" 由用户确认, 而非自动套用内部 API 优先级.
 
-### 5.2 模板填充
+### 3.2 模板填充
 
 将以下变量替换到模板占位符中:
 
 | 占位符 | 来源 | 示例值 |
 |--------|------|--------|
-| `{{PROJECT_NAME}}` | 项目画像 | `my-go-service` |
-| `{{DATE}}` | 当前日期 | `2026-06-18` |
-| `{{VERSION}}` | 默认 `1.0` | `1.0` |
-| `{{SCOPE}}` | 项目画像 | `Go, Gin, PostgreSQL, Kubernetes` |
-| `{{DOMAIN}}` | 项目画像推断 | `后端服务` |
-| `{{ROLE}}` | 项目画像推断 | `精通 Go 的架构师` |
-| `{{PRIORITIES}}` | 项目画像 + 维度 | `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度` (命中 api+database 时) |
+| `{{PROJECT_NAME}}` | profile.project_name | `my-go-service` |
+| `{{DATE}}` | runtime.current_date | `2026-06-18` |
+| `{{VERSION}}` | generator.default_version | `1.0` |
+| `{{SCOPE}}` | profile.scope | `Go, Gin, PostgreSQL, Kubernetes` |
+| `{{DOMAIN}}` | profile.domain | `后端服务` |
+| `{{ROLE}}` | profile.role | `精通 Go 的架构师` |
+| `{{PRIORITIES}}` | profile.priorities | `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度` (命中 api+database 时) |
 | `{{#dim-database}}...{{/dim-database}}` | 条件 block: 维度命中时展开内容 |
 | `{{#has_db}}...{{/has_db}}` | 条件 inline: 维度命中时展开 |
-| `{{USER_REDLINES_DATABASE}}` | 用户输入 | 用户输入的逐条红线 |
-| `{{USER_REDLINES_API}}` | 用户输入 | 用户输入的 API 维度逐条红线 |
-| `{{USER_REDLINES_CODE}}` | 用户输入 | 用户输入的代码维度逐条红线 |
-| `{{USER_REDLINES_DEPLOY}}` | 用户输入 | 用户输入的部署维度逐条红线 |
-| `{{USER_REDLINES_MAINTENANCE}}` | 用户输入 | 用户输入的运维维度逐条红线 |
-| `{{DIM_INDEX}}` | 维度顺序 | 维度段章节号; base.md 固定 3.1-3.4, 维度段从 3.5 起: code 总是 3.5, 其后 database/api/deploy/maintenance 按命中顺序递增 3.6/3.7/..., 未命中不插入, 编号连续无空洞 |
-| `{{TOOL_NAME}}` | 工具名 | `Claude Code` |
+| `{{USER_REDLINES_DATABASE}}` | user_input.redlines.database | 用户输入的逐条红线 |
+| `{{USER_REDLINES_API}}` | user_input.redlines.api | 用户输入的 API 维度逐条红线 |
+| `{{USER_REDLINES_CODE}}` | user_input.redlines.code | 用户输入的代码维度逐条红线 |
+| `{{USER_REDLINES_DEPLOY}}` | user_input.redlines.deploy | 用户输入的部署维度逐条红线 |
+| `{{USER_REDLINES_MAINTENANCE}}` | user_input.redlines.maintenance | 用户输入的运维维度逐条红线 |
+| `{{DIM_INDEX}}` | generator.dimension_index | 维度段章节号; base.md 固定 3.1-3.4, 维度段从 3.5 起: code 总是 3.5, 其后 database/api/deploy/maintenance 按命中顺序递增 3.6/3.7/..., 未命中不插入, 编号连续无空洞 |
+| `{{TOOL_NAME}}` | arguments.tool | `Claude Code` |
 
 模板中还有以下子对象占位符, 从项目画像的子字段填充:
 
 | 占位符 | 来源路径 | 说明 |
 |--------|---------|------|
-| `{{PROJECT_DESCRIPTION}}` | profile.deps_summary + profile.domain | 项目一句话描述 |
+| `{{PROJECT_DESCRIPTION}}` | profile.domain + profile.deps_summary | 项目一句话描述 |
 | `{{DIRS_TABLE}}` | profile.dirs_summary | 目录→用途的 Markdown 表格 |
 | `{{REFERENCES_SECTION}}` | profile.dirs_summary | 参考文档路径列表 |
 | `{{SCRIPTS_TABLE}}` | profile.scripts_summary | 命令→用途的 Markdown 表格 |
 | `{{TOPOLOGY_SECTION}}` | profile.security_summary + profile.deps_summary | 服务拓扑描述 |
 | `{{LANGUAGE}}` | profile.language | 编程语言 |
 | `{{FRAMEWORK}}` | profile.framework | 框架名 |
-| `{{BUILD_SYSTEM}}` | profile (推断) | 构建系统 |
-| `{{ENTRY_POINTS}}` | profile (推断) | 入口文件列表 |
-| `{{ARCH_PATTERN}}` | profile (推断) | 架构模式 |
+| `{{BUILD_SYSTEM}}` | profile.build_system | 构建系统 |
+| `{{ENTRY_POINTS}}` | profile.entry_points | 入口文件列表 |
+| `{{ARCH_PATTERN}}` | profile.arch_pattern | 架构模式 |
 | `{{ARCH_CONFIDENCE}}` | profile.confidence.arch_pattern | 架构推断置信度 |
 | `{{DB_DRIVERS}}` | profile.deps_summary.categorized.db_driver | 数据库驱动 |
-| `{{MIGRATION_TOOL}}` | profile.scripts_summary | 迁移工具 |
+| `{{MIGRATION_TOOL}}` | profile.scripts_summary.migrate | 迁移工具 |
 | `{{DB_TYPE}}` | profile.deps_summary.categorized.db_driver | 数据库类型 |
-| `{{HAS_DOCKERFILE}}` | profile (部署检测) | 是否有 Dockerfile |
-| `{{HAS_K8S}}` | profile (部署检测) | 是否有 K8s 配置 |
-| `{{HAS_TERRAFORM}}` | profile (部署检测) | 是否有 Terraform 配置 |
-| `{{CI_PIPELINE}}` | profile (配置检测) | CI/CD 描述 |
-| `{{LOG_LOCATIONS}}` | profile (运维检测) | 日志位置 |
-| `{{MONITORING_TOOLS}}` | profile (运维检测) | 监控工具 |
-| `{{ALERT_CONFIGS}}` | profile (运维检测) | 告警配置 |
+| `{{HAS_DOCKERFILE}}` | profile.deployment_summary.has_dockerfile | 是否有 Dockerfile |
+| `{{HAS_K8S}}` | profile.deployment_summary.has_k8s | 是否有 K8s 配置 |
+| `{{HAS_TERRAFORM}}` | profile.deployment_summary.has_terraform | 是否有 Terraform 配置 |
+| `{{CI_PIPELINE}}` | profile.deployment_summary.ci_pipeline | CI/CD 描述 |
+| `{{LOG_LOCATIONS}}` | profile.maintenance_summary.log_locations | 日志位置 |
+| `{{MONITORING_TOOLS}}` | profile.maintenance_summary.monitoring_tools | 监控工具 |
+| `{{ALERT_CONFIGS}}` | profile.maintenance_summary.alert_configs | 告警配置 |
 | `{{API_FRAMEWORKS}}` | profile.api_summary.frameworks | API 框架 |
 | `{{API_ROUTE_PATHS}}` | profile.api_summary.route_paths | 路由/控制器/Handler 路径 |
 | `{{API_SCHEMA_FILES}}` | profile.api_summary.schema_files | OpenAPI/Swagger/GraphQL/proto 契约文件 |
 | `{{API_AUTH_ENTRYPOINTS}}` | profile.api_summary.auth_entrypoints | 认证/授权入口 |
 | `{{API_TEST_PATHS}}` | profile.api_summary.test_paths | API/integration/e2e/contract 测试路径 |
 | `{{API_CONFIDENCE}}` | profile.api_summary.confidence | API 维度检测置信度 |
-| `{{SKILLS_INDEX}}` | profile (skills 扫描) | 技能索引列表 |
+| `{{SKILLS_INDEX}}` | capability_scan.skills | 技能索引列表 |
 | `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills 能力摘要 |
 | `{{LANGUAGE_CODE_STANDARDS}}` | profile.language + code-standards 模板 | 语言专属编码规范, 未命中时使用 generic |
 
@@ -366,9 +291,9 @@ API 维度影响优先级:
 
 维度 block 展开逻辑: 命中维度时保留 block 内容并去掉 `{{#dim-*}}` / `{{/dim-*}}` 标签; 未命中时整块删除. 能力 block 只有在 `available && confirmed` 同时成立时展开. 条件 inline (`{{#has_*}}`) 同理.
 
-### 5.3 写入输出文件
+### 3.3 写入输出文件
 
-普通工具将填充后的内容写入 target-path 下的三个文件:
+所有工具写入共享治理文件与所选工具入口:
 
 ```
 <target-path>/constitution.md
@@ -376,16 +301,7 @@ API 维度影响优先级:
 <target-path>/{TOOL}.md
 ```
 
-Kimi 写入四个文件:
-
-```
-<target-path>/constitution.md
-<target-path>/AGENTS.md
-<target-path>/KIMI.md
-<target-path>/.kimi-code/AGENTS.md
-```
-
-仅在用户确认生成 Kimi 后创建 `.kimi-code/` 目录. `KIMI.md` 与 `.kimi-code/AGENTS.md` 分别使用 Phase 2 确认的文件级策略; 两者不得绑定处理或相互代替.
+Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AGENTS.md`. 仅在用户确认 Kimi 后创建 `.kimi-code/`; 两个入口分别使用 Phase 2 确认的文件级策略, 不得绑定处理或相互代替.
 
 已存在文件处理:
 1. 使用 Phase 2 已确认的文件级策略: 覆盖 (备份到 `.governance-backup/`) / 合并 / 跳过.
@@ -394,7 +310,7 @@ Kimi 写入四个文件:
 4. 跳过: 不写入.
 5. 若 Phase 2 未记录某个已存在文件的处理策略, 必须暂停并再次询问, 不得默认覆盖.
 
-### 5.4 来源标注
+### 3.4 来源标注
 
 每个生成文件的 section 末尾添加 HTML 注释标注填充来源:
 
@@ -406,24 +322,9 @@ Kimi 写入四个文件:
 <!-- source: capability-detect, confirmed: true -->
 ```
 
-## Phase 6: 完成摘要
+## Phase 4: 完成摘要
 
-展示生成结果. Kimi 目标示例:
-
-```
-治理文档生成完成:
-
-✅ constitution.md — 已确认维度与红线
-✅ AGENTS.md — 项目事实层, 8 个章节
-✅ KIMI.md — Kimi Code CLI 完整工具入口
-✅ .kimi-code/AGENTS.md — Kimi Code CLI 原生桥接入口
-
-⚠ 需确认项 (2 项):
-  - 架构模式推断为 "分层架构" (confidence: MEDIUM)
-  - 外部服务: Redis (confidence: LOW, 未检测到连接配置)
-
-请 review 生成文件, 特别关注标注为 infer 和 user-input 的 section.
-```
+展示每个目标文件的 create/merge/overwrite/skip/failed 状态, 已确认的维度与能力, 以及所有 LOW/UNKNOWN confidence 或缺失证据项. Kimi 需分别报告 `KIMI.md` 与 `.kimi-code/AGENTS.md`; 不得在任一入口失败时宣称四文件完整. 提醒用户重点审查 infer 和 user-input 来源段落.
 
 ## 错误处理
 
@@ -458,7 +359,7 @@ Kimi 写入四个文件:
 - [ ] API 维度证据已展示并由用户确认
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则
 - [ ] 用户确认的 MCP/skills 条件 block 正确展开
-- [ ] 交互确认流程完成 (Phase 2-4: 检测结果确认, 能力确认, 红线收集)
+- [ ] Phase 2 建议设置已一次性确认; 追加提问仅覆盖未决字段
 - [ ] 模板选择正确
 - [ ] 语言专属编码规范模板选择正确
 - [ ] 占位符全部填充, 无残留 `{{ }}`

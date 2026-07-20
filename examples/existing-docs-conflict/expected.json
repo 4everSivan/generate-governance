@@ -1,0 +1,25 @@
+{
+  "kind": "project",
+  "dimensions": {
+    "enabled": ["code"],
+    "disabled": ["api", "database", "deploy", "maintenance"]
+  },
+  "evidence": {
+    "required_paths": ["package.json"],
+    "required_dependencies": []
+  },
+  "api": {
+    "confidence": "UNKNOWN",
+    "auth_state": "UNKNOWN",
+    "assumed_internal": false
+  },
+  "governance": {
+    "existing_files": ["AGENTS.md", "CLAUDE.md", "constitution.md"],
+    "user_custom_files": ["AGENTS.md", "CLAUDE.md", "constitution.md"],
+    "protected_files": ["AGENTS.md", "CLAUDE.md", "constitution.md"],
+    "recommended_tool": "claude",
+    "requires_tool_choice": false,
+    "requires_confirmation": true
+  },
+  "forbidden_inferences": ["api_from_governance_docs", "internal_api_without_auth"]
+}

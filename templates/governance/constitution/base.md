@@ -3,7 +3,7 @@
 
 Version: {{VERSION}}, Ratified: {{DATE}}
 Scope: {{SCOPE}}
-Priority: 本文件定义最高优先级安全红线, 工作模式和大模型行为边界. 优先级高于 `AGENTS.md`, 工具入口, generated subagent body, skills 和设计说明.
+Priority: 本文件是项目级最高治理规则, 定义安全红线, 工作模式和大模型行为边界. 平台, 系统, 开发者和工具强制安全指令始终优先; 在项目治理范围内, 本文件高于 `AGENTS.md`, 工具入口, generated subagent body, skills 和设计说明.
 
 本文件只定义不可违反的原则与模式切换. 项目事实, 路径, 脚本由 `AGENTS.md` 维护; 领域知识与排查程序由 skills 维护; 输出模板和自审清单由 templates 维护. 本文件不保存项目事实, 不保存领域知识, 不保存产品手册.
 

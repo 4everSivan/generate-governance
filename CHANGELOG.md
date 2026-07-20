@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- 修正生成模板的指令层级: 平台, 系统, 开发者和工具强制安全指令始终高于项目级 `constitution.md`.
+- 补齐 `ProjectProfile` 的构建、入口、架构、部署与运维字段, 并校验模板变量来源.
+
+### Changed
+
+- 将项目画像, 文件策略, 工具入口, 维度, 环境能力与自定义红线合并为一次建议设置确认; 仅在必选字段未决时追加提问.
+- 将共享能力摘要与 Skill 索引收敛到 `AGENTS.md`, 工具入口只保留引用; 删除重复确认文案与长完成示例.
+
+### Added
+
+- 新增 4 组 fixture 的 `expected.json` 与离线 evaluator, 覆盖 7 个维度、证据、文件保护和工具入口场景.
+
 ## [0.3.0] - 2026-07-17
 
 ### Added
@@ -32,13 +48,13 @@
 
 - 合并现有文档扫描与维度确认为一轮交互 (Phase 2+3), 交互轮次从 4 轮减到 3 轮, 不改变生成内容; 后续 Phase 顺延重编号.
 - 五个维度模板章节号改用动态 `{{DIM_INDEX}}`, 消除多维度同启时的 `3.X/3.Y/3.Z` 编号撞车.
-- 优先级层级修正为 `constitution.md` 红线高于工具系统指令, 与 `base.md` 声明一致.
+- 明确 `constitution.md` 仅为项目级最高规则, 不得覆盖平台, 系统, 开发者或工具强制安全指令.
 - `SUMMARIZE_PROMPT` 补全内部 API (无敏感数据) 第三种优先级分支 `接口契约稳定性`.
 - `api_summary` 列入 `SUMMARIZE_SCHEMA` 必填字段; `confidence.api` 枚举补 `UNKNOWN`, 与 `API_SCHEMA`、`api_summary` 三处一致.
 
 ### Fixed
 
-- 修复 `agents/base.md` 优先级层级自相矛盾 (工具系统指令曾排在 constitution 之上).
+- 修复 `agents/base.md` 的项目治理层级表述, 区分平台/系统指令与项目级规则.
 - 修复 `skill.md` `{{PRIORITIES}}` 示例对 api+database 项目漏掉 API 安全优先级.
 - 修复 `{{HAS_IAC}}` 占位符无来源问题, 替换为映射 `config.deployment.has_terraform` 的 `{{HAS_TERRAFORM}}`.
 - 补全 `skill.md` 未文档化的 `{{USER_REDLINES_CODE/DEPLOY/MAINTENANCE}}` 占位符.

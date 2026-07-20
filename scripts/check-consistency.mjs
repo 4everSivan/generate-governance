@@ -63,6 +63,22 @@ function extractDeclaredTokens(skillMd) {
   }))
 }
 
+function extractDeclaredTokenSources(skillMd) {
+  const sources = new Map()
+  const pattern = /^\|\s*`\{\{([^{}]+)\}\}`\s*\|\s*([^|]+?)\s*\|/gm
+  let match
+
+  while ((match = pattern.exec(skillMd)) !== null) {
+    const token = match[1].trim()
+    const source = match[2].trim()
+    const tokenSources = sources.get(token) ?? new Set()
+    tokenSources.add(source)
+    sources.set(token, tokenSources)
+  }
+
+  return sources
+}
+
 function parseDimensions(workflow) {
   const match = workflow.match(/items:\s*\{\s*type:\s*'string',\s*enum:\s*\[([^\]]+)\]/m)
   if (!match) {
@@ -82,6 +98,50 @@ function checkTemplateTokens() {
   for (const token of usedTokens) {
     if (!declared.has(token)) {
       fail(`Template token {{${token}}} is not declared in SKILL.md`)
+    }
+  }
+}
+
+function checkTemplateTokenSources() {
+  const skillMd = read('SKILL.md')
+  const sources = extractDeclaredTokenSources(skillMd)
+  const templateFiles = walk('templates').filter((file) => file.endsWith('.md'))
+  const usedTokens = unique(templateFiles.flatMap((file) => extractTemplateTokens(read(file))))
+
+  for (const token of usedTokens) {
+    if (token.startsWith('#') || token.startsWith('/')) {
+      continue
+    }
+
+    const tokenSources = sources.get(token)
+    if (!tokenSources || tokenSources.size === 0) {
+      fail(`Template token {{${token}}} has no declared source row in SKILL.md`)
+    } else if (tokenSources.size > 1) {
+      fail(`Template token {{${token}}} has multiple declared sources: ${[...tokenSources].join(', ')}`)
+    }
+  }
+}
+
+function checkProfileTokenSources() {
+  const skillMd = read('SKILL.md')
+  const workflow = read('workflow-analyze.js')
+  const sources = extractDeclaredTokenSources(skillMd)
+  const summarizeBlock = sliceSchemaBlock(workflow, 'SUMMARIZE_SCHEMA')
+  const requiredMatch = summarizeBlock.match(/^ {2}required:\s*\[([^\]]+)\]/m)
+
+  if (!requiredMatch) {
+    fail('Could not find top-level required fields in SUMMARIZE_SCHEMA')
+    return
+  }
+
+  const requiredFields = new Set([...requiredMatch[1].matchAll(/'([^']+)'/g)].map((item) => item[1]))
+  for (const [token, tokenSources] of sources) {
+    for (const source of tokenSources) {
+      for (const match of source.matchAll(/profile\.([a-z_]+)/g)) {
+        if (!requiredFields.has(match[1])) {
+          fail(`Template token {{${token}}} references non-required ProjectProfile field: ${match[1]}`)
+        }
+      }
     }
   }
 }
@@ -114,8 +174,7 @@ function checkToolEntryTemplates() {
   if (exists(kimiTemplatePath)) {
     const kimiTemplate = read(kimiTemplatePath)
     const requiredKimiContent = [
-      '{{CAPABILITIES_SUMMARY}}',
-      '{{SKILLS_INDEX}}',
+      'AGENTS.md',
       'explore',
       'plan',
       'coder',
@@ -123,6 +182,19 @@ function checkToolEntryTemplates() {
     for (const content of requiredKimiContent) {
       if (!kimiTemplate.includes(content)) {
         fail(`Kimi tool entry template missing required content: ${content}`)
+      }
+    }
+  }
+
+  const agentsTemplate = read('templates/governance/agents/base.md')
+  for (const sharedToken of ['{{CAPABILITIES_SUMMARY}}', '{{SKILLS_INDEX}}']) {
+    if (!agentsTemplate.includes(sharedToken)) {
+      fail(`AGENTS template missing shared capability token: ${sharedToken}`)
+    }
+    for (const tool of supportedToolEntries) {
+      const toolTemplate = read(`templates/governance/tool-entry/${tool}.md`)
+      if (toolTemplate.includes(sharedToken)) {
+        fail(`Tool entry ${tool} duplicates AGENTS shared token: ${sharedToken}`)
       }
     }
   }
@@ -145,7 +217,7 @@ function checkKimiSkillContract() {
   const skillMd = read('SKILL.md')
   const requiredFragments = new Map([
     ['tool argument', '--tool claude|gemini|codex|kiro|kimi'],
-    ['grouped entry detection', '`KIMI.md` 或 `.kimi-code/AGENTS.md` 任一存在'],
+    ['grouped entry detection', 'Kimi 双入口算一个工具'],
     ['native template selection', 'templates/governance/tool-entry/kimi-native-agents.md'],
     ['native output path', '<target-path>/.kimi-code/AGENTS.md'],
     ['blocked native directory handling', '`.kimi-code` 是普通文件或目录不可创建'],
@@ -271,6 +343,15 @@ function checkPackageFiles() {
   if (!pkg.scripts?.check) {
     fail('package.json missing scripts.check')
   }
+  if (!pkg.scripts?.eval) {
+    fail('package.json missing scripts.eval')
+  }
+  if (!pkg.scripts?.test?.includes('npm run check') || !pkg.scripts.test.includes('npm run eval')) {
+    fail('package.json test script must run check and eval')
+  }
+  if (!exists('scripts/eval-fixtures.mjs')) {
+    fail('Missing offline fixture evaluator: scripts/eval-fixtures.mjs')
+  }
 }
 
 function checkExamples() {
@@ -285,6 +366,10 @@ function checkExamples() {
     const expected = path.join('examples', example.name, 'expected.md')
     if (!exists(expected)) {
       fail(`Example missing expected.md: ${example.name}`)
+    }
+    const expectedJson = path.join('examples', example.name, 'expected.json')
+    if (!exists(expectedJson)) {
+      fail(`Example missing expected.json: ${example.name}`)
     }
   }
 }
@@ -351,12 +436,78 @@ function checkKimiDocumentationContract() {
   }
 
   const changelog = read('CHANGELOG.md')
-  if (!changelog.includes('## [Unreleased]') || !changelog.includes('Kimi Code CLI')) {
-    fail('CHANGELOG missing unreleased Kimi Code CLI entry')
+  if (!changelog.includes('Kimi Code CLI')) {
+    fail('CHANGELOG missing Kimi Code CLI entry')
+  }
+}
+
+function checkReadmeVersion() {
+  const readme = read('README.md')
+  const pkg = JSON.parse(read('package.json'))
+  const expected = `当前 npm 包版本为 \`${pkg.version}\``
+
+  if (!readme.includes(expected)) {
+    fail(`README package version does not match package.json: ${pkg.version}`)
+  }
+}
+
+function checkInstructionHierarchy() {
+  const constitution = read('templates/governance/constitution/base.md')
+  const agents = read('templates/governance/agents/base.md')
+  const checklist = read('docs/review-checklist.md')
+  const requiredConstitutionText = '平台, 系统, 开发者和工具强制安全指令始终优先'
+  const requiredAgentsText = '平台/System/Developer/工具强制安全指令 > `constitution.md`'
+
+  if (!constitution.includes(requiredConstitutionText)) {
+    fail(`Constitution must preserve platform/system authority: ${requiredConstitutionText}`)
+  }
+  if (!agents.includes(requiredAgentsText)) {
+    fail(`AGENTS hierarchy must preserve platform/system authority: ${requiredAgentsText}`)
+  }
+  if (!checklist.includes('Platform, system, developer, and tool safety instructions must not be overridden')) {
+    fail('Review checklist must preserve platform/system authority')
+  }
+
+  const combined = `${constitution}\n${agents}`
+  for (const forbidden of ['constitution.md` > 工具系统指令', '`constitution.md` 红线高于工具系统指令']) {
+    if (combined.includes(forbidden)) {
+      fail(`Unsafe instruction hierarchy found: ${forbidden}`)
+    }
+  }
+}
+
+function checkConsolidatedConfirmationContract() {
+  const skillMd = read('SKILL.md')
+  const readme = read('README.md')
+  const requiredFragments = [
+    '## Phase 2: 建议设置确认',
+    '`proposed_settings`',
+    '`file_strategies`',
+    '`confirmed_dimensions`',
+    '`confirmed_capabilities`',
+    '`user_redlines`',
+    '按建议生成',
+    '只有以下情况允许追加提问',
+  ]
+
+  for (const fragment of requiredFragments) {
+    if (!skillMd.includes(fragment)) {
+      fail(`SKILL.md missing consolidated confirmation contract: ${fragment}`)
+    }
+  }
+  for (const obsolete of ['## Phase 3: 第二轮交互', '## Phase 4: 第三轮交互']) {
+    if (skillMd.includes(obsolete)) {
+      fail(`SKILL.md still contains obsolete confirmation phase: ${obsolete}`)
+    }
+  }
+  if (!readme.includes('建议设置确认 (文件+维度+能力+红线)')) {
+    fail('README missing consolidated confirmation workflow')
   }
 }
 
 checkTemplateTokens()
+checkTemplateTokenSources()
+checkProfileTokenSources()
 checkDimensionTemplates()
 checkToolEntryTemplates()
 checkKimiSkillContract()
@@ -367,6 +518,9 @@ checkPackageFiles()
 checkExamples()
 checkKimiExamples()
 checkKimiDocumentationContract()
+checkInstructionHierarchy()
+checkReadmeVersion()
+checkConsolidatedConfirmationContract()
 
 if (errors.length > 0) {
   console.error('Consistency check failed:')

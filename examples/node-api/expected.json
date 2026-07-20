@@ -1,0 +1,25 @@
+{
+  "kind": "project",
+  "dimensions": {
+    "enabled": ["api", "code"],
+    "disabled": ["database", "deploy", "maintenance"]
+  },
+  "evidence": {
+    "required_paths": ["openapi.yaml", "package.json", "src/routes/users.ts", "tests/users.contract.test.ts"],
+    "required_dependencies": ["express", "zod"]
+  },
+  "api": {
+    "confidence": "HIGH",
+    "auth_state": "UNKNOWN",
+    "assumed_internal": false
+  },
+  "governance": {
+    "existing_files": [],
+    "user_custom_files": [],
+    "protected_files": [],
+    "recommended_tool": "claude",
+    "requires_tool_choice": false,
+    "requires_confirmation": true
+  },
+  "forbidden_inferences": ["internal_api_without_auth"]
+}

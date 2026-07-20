@@ -1,0 +1,46 @@
+{
+  "kind": "tool-entry-cases",
+  "allowed_strategies": ["merge", "overwrite", "skip"],
+  "cases": {
+    "kimi-md-only": {
+      "existing_files": ["KIMI.md"],
+      "user_custom_files": [],
+      "protected_files": ["KIMI.md"],
+      "grouped_tools": ["kimi"],
+      "recommended_tool": "kimi",
+      "requires_tool_choice": false,
+      "requires_confirmation": true,
+      "suggested_creations": [".kimi-code/AGENTS.md"]
+    },
+    "native-only": {
+      "existing_files": [".kimi-code/AGENTS.md"],
+      "user_custom_files": [],
+      "protected_files": [".kimi-code/AGENTS.md"],
+      "grouped_tools": ["kimi"],
+      "recommended_tool": "kimi",
+      "requires_tool_choice": false,
+      "requires_confirmation": true,
+      "suggested_creations": ["KIMI.md"]
+    },
+    "both": {
+      "existing_files": [".kimi-code/AGENTS.md", "KIMI.md"],
+      "user_custom_files": [".kimi-code/AGENTS.md", "KIMI.md"],
+      "protected_files": [".kimi-code/AGENTS.md", "KIMI.md"],
+      "grouped_tools": ["kimi"],
+      "recommended_tool": "kimi",
+      "requires_tool_choice": false,
+      "requires_confirmation": true,
+      "suggested_creations": []
+    },
+    "kimi-and-kiro": {
+      "existing_files": ["KIMI.md", "KIRO.md"],
+      "user_custom_files": [],
+      "protected_files": ["KIMI.md", "KIRO.md"],
+      "grouped_tools": ["kiro", "kimi"],
+      "recommended_tool": "kiro",
+      "requires_tool_choice": true,
+      "requires_confirmation": true,
+      "suggested_creations": []
+    }
+  }
+}

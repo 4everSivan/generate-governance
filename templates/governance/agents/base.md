@@ -27,7 +27,7 @@
 
 ## 3. 规则层级与单一事实源映射
 
-优先级 (高→低): `constitution.md` > 工具系统指令 > 本文件 `AGENTS.md` > 工具入口 > generated subagent body > `.agents/skills/*` > 设计说明 > 单次偏好.
+优先级 (高→低): 平台/System/Developer/工具强制安全指令 > `constitution.md` > 本文件 `AGENTS.md` > 工具入口 > generated subagent body > `.agents/skills/*` > 设计说明 > 单次偏好.
 
 冲突裁决: 项目路径/脚本/数据入口以本文件为准; 用户授权不能覆盖 `constitution.md` 红线.
 
@@ -87,6 +87,10 @@
 以下规则仅在生成时检测到对应 MCP/skill 且经用户确认后出现. 未出现的能力不得被视为项目强制依赖.
 
 {{CAPABILITIES_SUMMARY}}
+
+### Skill 索引
+
+{{SKILLS_INDEX}}
 
 {{#has_mcp_semble}}
 ### Semble 代码搜索

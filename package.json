@@ -29,7 +29,8 @@
   ],
   "scripts": {
     "check": "node scripts/check-consistency.mjs",
-    "test": "node bin/install.js --dry-run --target /tmp/generate-governance-skill-test"
+    "eval": "node scripts/eval-fixtures.mjs",
+    "test": "npm run check && npm run eval && node bin/install.js --dry-run --target /tmp/generate-governance-skill-test"
   },
   "engines": {
     "node": ">=18"

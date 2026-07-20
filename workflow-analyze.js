@@ -32,7 +32,7 @@ const CODE_STRUCTURE_SCHEMA = {
     },
     confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
   },
-  required: ['language', 'framework', 'build_system', 'entry_points', 'arch_pattern', 'confidence'],
+  required: ['language', 'framework', 'build_system', 'entry_points', 'dir_layout', 'arch_pattern', 'code_conventions', 'confidence'],
 }
 
 const DEPENDENCY_SCHEMA = {
@@ -58,12 +58,16 @@ const DEPENDENCY_SCHEMA = {
         cache: { type: 'array', items: { type: 'string' } },
         http: { type: 'array', items: { type: 'string' } },
         auth: { type: 'array', items: { type: 'string' } },
+        logging: { type: 'array', items: { type: 'string' } },
+        testing: { type: 'array', items: { type: 'string' } },
+        other: { type: 'array', items: { type: 'string' } },
       },
+      required: ['db_driver', 'mq', 'cache', 'http', 'auth', 'logging', 'testing', 'other'],
     },
     version_constraints: { type: 'array', items: { type: 'string' }, description: 'Known version constraints or compatibility notes' },
     external_services_inferred: { type: 'array', items: { type: 'string' }, description: 'Inferred external services (PostgreSQL, Redis, Kafka, etc.)' },
   },
-  required: ['deps', 'categorized'],
+  required: ['deps', 'categorized', 'version_constraints', 'external_services_inferred'],
 }
 
 const CONFIG_SCHEMA = {
@@ -71,6 +75,15 @@ const CONFIG_SCHEMA = {
   properties: {
     scripts: {
       type: 'object',
+      properties: {
+        build: { type: 'string' },
+        test: { type: 'string' },
+        run: { type: 'string' },
+        lint: { type: 'string' },
+        migrate: { type: 'string' },
+        deploy: { type: 'string' },
+      },
+      required: ['build', 'test', 'run', 'lint', 'migrate', 'deploy'],
       description: 'Key scripts: build, test, run, lint, migrate, deploy etc.',
     },
     ci_pipeline: { type: 'string', description: 'CI/CD pipeline description (provider, key stages)' },
@@ -82,12 +95,26 @@ const CONFIG_SCHEMA = {
         has_terraform: { type: 'boolean' },
         has_docker_compose: { type: 'boolean' },
         description: { type: 'string' },
+        evidence: { type: 'array', items: { type: 'string' } },
+        confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
       },
+      required: ['has_dockerfile', 'has_k8s', 'has_terraform', 'has_docker_compose', 'description', 'evidence', 'confidence'],
     },
     config_patterns: { type: 'array', items: { type: 'string' }, description: 'Config file patterns (env, yaml, toml, json)' },
     quality_tools: { type: 'array', items: { type: 'string' }, description: 'Lint, format, static analysis tools' },
+    maintenance: {
+      type: 'object',
+      properties: {
+        log_locations: { type: 'array', items: { type: 'string' } },
+        monitoring_tools: { type: 'array', items: { type: 'string' } },
+        alert_configs: { type: 'array', items: { type: 'string' } },
+        evidence: { type: 'array', items: { type: 'string' } },
+        confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+      },
+      required: ['log_locations', 'monitoring_tools', 'alert_configs', 'evidence', 'confidence'],
+    },
   },
-  required: ['scripts'],
+  required: ['scripts', 'ci_pipeline', 'deployment', 'config_patterns', 'quality_tools', 'maintenance'],
 }
 
 const SECURITY_SCHEMA = {
@@ -99,7 +126,7 @@ const SECURITY_SCHEMA = {
     input_validation: { type: 'string', description: 'Input validation approach (validator lib, middleware, manual, none detected)' },
     security_policies: { type: 'array', items: { type: 'string' }, description: 'Existing security policy/config files found' },
   },
-  required: ['auth_mechanism'],
+  required: ['auth_mechanism', 'sensitive_data_handling', 'permission_model', 'input_validation', 'security_policies'],
 }
 
 const API_SCHEMA = {
@@ -138,7 +165,7 @@ const API_SCHEMA = {
     },
     confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
   },
-  required: ['has_api', 'frameworks', 'route_paths', 'schema_files', 'auth_entrypoints', 'test_paths', 'confidence'],
+  required: ['has_api', 'frameworks', 'route_paths', 'schema_files', 'auth_entrypoints', 'test_paths', 'evidence', 'confidence'],
 }
 
 // --- Agent prompts ---
@@ -166,8 +193,9 @@ const CONFIG_PROMPT = `Analyze build/run/CI/deploy configuration at "${args.targ
 3. Check deployment descriptors: Dockerfile, docker-compose.yml, k8s manifests, Terraform files.
 4. List config file patterns in use.
 5. List quality tools (linters, formatters, static analysis).
+6. Identify observable log locations, monitoring tools, and alert configuration. Include evidence and confidence; use empty arrays and UNKNOWN when absent.
 
-If a category is absent, say so explicitly — don't invent.`
+Use empty strings for absent standard scripts and empty arrays for absent lists. Do not invent.`
 
 const SECURITY_PROMPT = `Analyze security patterns at "${args.targetPath}". Your task:
 1. Identify the auth mechanism (JWT middleware, OAuth2 flow, session-based, API key, basic auth, or none detected).
@@ -208,6 +236,9 @@ const SUMMARIZE_SCHEMA = {
     project_name: { type: 'string', description: 'Project name derived from directory name or package.json name field' },
     language: { type: 'string' },
     framework: { type: 'string' },
+    build_system: { type: 'string' },
+    entry_points: { type: 'array', items: { type: 'string' } },
+    arch_pattern: { type: 'string' },
     domain: { type: 'string', description: 'Domain description in Chinese (e.g., 后端服务, Web应用, 数据处理, CLI工具)' },
     role: { type: 'string', description: 'Expert role description in Chinese (e.g., 精通 Go 的架构师, 精通 Python 的后端专家)' },
     priorities: {
@@ -223,10 +254,38 @@ const SUMMARIZE_SCHEMA = {
     scope: { type: 'string', description: 'Scope description: key technologies and products covered' },
     deps_summary: {
       type: 'object',
+      properties: {
+        categorized: {
+          type: 'object',
+          properties: {
+            db_driver: { type: 'array', items: { type: 'string' } },
+            mq: { type: 'array', items: { type: 'string' } },
+            cache: { type: 'array', items: { type: 'string' } },
+            http: { type: 'array', items: { type: 'string' } },
+            auth: { type: 'array', items: { type: 'string' } },
+            logging: { type: 'array', items: { type: 'string' } },
+            testing: { type: 'array', items: { type: 'string' } },
+            other: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['db_driver', 'mq', 'cache', 'http', 'auth', 'logging', 'testing', 'other'],
+        },
+        external_services: { type: 'array', items: { type: 'string' } },
+        version_constraints: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['categorized', 'external_services', 'version_constraints'],
       description: 'Key dependencies organized by category',
     },
     scripts_summary: {
       type: 'object',
+      properties: {
+        build: { type: 'string' },
+        test: { type: 'string' },
+        run: { type: 'string' },
+        lint: { type: 'string' },
+        migrate: { type: 'string' },
+        deploy: { type: 'string' },
+      },
+      required: ['build', 'test', 'run', 'lint', 'migrate', 'deploy'],
       description: 'Key scripts: build, test, run, lint, etc.',
     },
     dirs_summary: {
@@ -235,6 +294,14 @@ const SUMMARIZE_SCHEMA = {
     },
     security_summary: {
       type: 'object',
+      properties: {
+        auth_mechanism: { type: 'string' },
+        sensitive_data_handling: { type: 'string' },
+        permission_model: { type: 'string' },
+        input_validation: { type: 'string' },
+        security_policies: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['auth_mechanism', 'sensitive_data_handling', 'permission_model', 'input_validation', 'security_policies'],
       description: 'Security findings summary',
     },
     api_summary: {
@@ -248,20 +315,47 @@ const SUMMARIZE_SCHEMA = {
         evidence: { type: 'array', items: { type: 'string' } },
         confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
       },
+      required: ['frameworks', 'route_paths', 'schema_files', 'auth_entrypoints', 'test_paths', 'evidence', 'confidence'],
       description: 'API surface evidence and governance-relevant facts',
+    },
+    deployment_summary: {
+      type: 'object',
+      properties: {
+        has_dockerfile: { type: 'boolean' },
+        has_docker_compose: { type: 'boolean' },
+        has_k8s: { type: 'boolean' },
+        has_terraform: { type: 'boolean' },
+        ci_pipeline: { type: 'string' },
+        description: { type: 'string' },
+        evidence: { type: 'array', items: { type: 'string' } },
+        confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+      },
+      required: ['has_dockerfile', 'has_docker_compose', 'has_k8s', 'has_terraform', 'ci_pipeline', 'description', 'evidence', 'confidence'],
+    },
+    maintenance_summary: {
+      type: 'object',
+      properties: {
+        log_locations: { type: 'array', items: { type: 'string' } },
+        monitoring_tools: { type: 'array', items: { type: 'string' } },
+        alert_configs: { type: 'array', items: { type: 'string' } },
+        evidence: { type: 'array', items: { type: 'string' } },
+        confidence: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+      },
+      required: ['log_locations', 'monitoring_tools', 'alert_configs', 'evidence', 'confidence'],
     },
     confidence: {
       type: 'object',
       properties: {
-        language: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
-        framework: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
-        arch_pattern: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
-        dimensions: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
+        language: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+        framework: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+        arch_pattern: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
+        dimensions: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
         api: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] },
       },
+      required: ['language', 'framework', 'arch_pattern', 'dimensions', 'api'],
     },
   },
-  required: ['project_name', 'language', 'framework', 'domain', 'role', 'priorities', 'dimensions', 'scope', 'api_summary'],
+  required: ['project_name', 'language', 'framework', 'build_system', 'entry_points', 'arch_pattern', 'domain', 'role', 'priorities', 'dimensions', 'scope', 'deps_summary', 'scripts_summary', 'dirs_summary', 'security_summary', 'api_summary', 'deployment_summary', 'maintenance_summary', 'confidence'],
 }
 
 const SUMMARIZE_PROMPT = `Synthesize a project profile from these five analysis results. The profile will drive governance document generation.
@@ -275,7 +369,7 @@ Analysis results:
 
 Instructions:
 1. **project_name**: Use the directory name, or the name field from the package manifest.
-2. **language / framework**: From code structure analysis.
+2. **language / framework / build_system / entry_points / arch_pattern**: Copy from code structure analysis. Use empty arrays or "unknown" when evidence is absent.
 3. **domain**: Describe the project's domain in Chinese. Be specific — "电商后端服务" is better than "后端服务".
 4. **role**: Construct the expert role in Chinese. Pattern: "精通 {language} 的 {domain_specialist}". For Go backend → "精通 Go 的后端架构师". For Python data → "精通 Python 的数据工程师". Add DB expertise if dim-database applies.
 5. **priorities**: Build an ordered priority list. Base: 数据安全 > 服务可用性 > 可恢复性 > 证据可信度 > ... Adapt to domain. If api applies with database, use 数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度. If api applies without database, start with API 安全与契约兼容. Do NOT auto-downgrade priority based on missing auth entrypoints: absent auth evidence is an uncertainty or risk to flag in scope/evidence (e.g. note "auth 未检测, 风险未知"), not a signal to treat the API as internal and switch to 接口契约稳定性. If the user later explicitly confirms an API is internal with no sensitive data, 接口契约稳定性 > 服务可用性 > 可恢复性 > 证据可信度 may be used — but this requires explicit user confirmation, not inference from empty auth_entrypoints. For non-DB, non-API projects, start with 服务可用性.
@@ -287,8 +381,10 @@ Instructions:
    - api: if API route/controller/schema/framework/test evidence is present; mark LOW confidence for SDK-client-only or ambiguous "api" directories so the user can confirm
 7. **api_summary**: Condense API evidence from apiResult. Include frameworks, route_paths, schema_files, auth_entrypoints, test_paths, evidence, and confidence.
 8. **scope**: List the key technologies (language, framework, key deps, deploy tech, API frameworks) as a comma-separated list.
-9. **deps/scripts/dirs/security/api summaries**: Condense from the analysis results — what matters for governance.
-10. **confidence**: Assess confidence in each key determination.`
+9. **deps/scripts/dirs/security summaries**: Condense from the corresponding analysis results. Use empty strings for absent standard scripts, empty collections for absent lists, and explicit unknown values instead of inventing facts.
+10. **deployment_summary**: Copy deployment booleans, CI description, evidence, and confidence from configResult. Use false, empty arrays, and UNKNOWN when absent.
+11. **maintenance_summary**: Copy log locations, monitoring tools, alert configs, evidence, and confidence from configResult. Use empty arrays and UNKNOWN when absent.
+12. **confidence**: Assess every required confidence field; use UNKNOWN when the evidence does not support a stronger value.`
 
 const profile = await agent(SUMMARIZE_PROMPT, { label: 'summarize', schema: SUMMARIZE_SCHEMA })
 

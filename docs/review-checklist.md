@@ -49,9 +49,21 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 - Do not let generic language guidance override stronger project-local standards.
 - Keep language standards concise enough to be useful in generated documents.
 
+## Rule Traceability
+
+| Rule group | Source of truth | Offline guard | Simplification boundary |
+|------------|-----------------|---------------|-------------------------|
+| Instruction hierarchy | constitution/AGENTS templates | `checkInstructionHierarchy` | Never place project files above platform or system instructions |
+| ProjectProfile and template fields | `workflow-analyze.js` + SKILL source table | `checkTemplateTokenSources`, `checkProfileTokenSources` | Move schemas to machine checks; do not invent missing facts |
+| Consolidated confirmation | SKILL Phase 2 | `checkConsolidatedConfirmationContract` + fixture governance expectations | Remove repeated prompts, not existing-file or ambiguity gates |
+| Kimi dual entry | SKILL + Kimi templates | `checkKimiSkillContract`, Kimi fixture cases | Share tool detection; preserve per-file strategies and failure reporting |
+| Shared capabilities | AGENTS template | `checkToolEntryTemplates` | Keep one shared source; tool entries only reference it |
+| Dimension and evidence rules | Workflow prompts + SKILL fallback scan | `eval-fixtures.mjs` | Offline eval checks deterministic evidence only, not model quality |
+| Unique safety rules | constitution and dimension templates | Human review in this checklist | Keep until behavioral evaluation supports removal |
+
 ## Release Review
 
 - `README.md`, `CHANGELOG.md`, package `files`, and install behavior should describe the same shipped capability set.
 - `npm pack --dry-run` should not include local planning docs, IDE metadata, or release drafting files.
-- New fixtures under `examples/` should include `expected.md` with human-readable assertions.
+- New fixtures under `examples/` should include human-readable `expected.md` and machine-readable `expected.json` assertions.
 - Kimi templates should use Kimi-native capabilities and must not present Claude-specific terms as Kimi features.
