@@ -1,0 +1,208 @@
+{
+  "kind": "capability-profile-cases",
+  "cases": {
+    "superpowers-suite-metadata-complete": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "suite_metadata", "metadata_complete": true, "referenced_members": ["brainstorming", "verification", "implementation"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": true,
+          "has_workflow_superpowers_and_openspec": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "suite_metadata", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": true, "members": ["brainstorming", "verification", "implementation"], "missing_members": [] }
+        }
+      }
+    },
+    "superpowers-metadata-without-explicit-complete": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "suite_metadata", "referenced_members": ["brainstorming", "verification", "implementation"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "suite_metadata", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": false, "members": ["brainstorming", "verification", "implementation"], "missing_members": [] }
+        }
+      }
+    },
+    "superpowers-using-members-resolvable": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "referenced_members": ["brainstorming", "verification", "implementation"], "resolved_members": ["brainstorming", "verification", "implementation"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": true
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": true, "members": ["brainstorming", "verification", "implementation"], "missing_members": [] }
+        }
+      }
+    },
+    "superpowers-using-without-resolved-members": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "referenced_members": ["brainstorming", "verification", "implementation"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": false, "members": ["brainstorming", "verification", "implementation"], "missing_members": ["brainstorming", "verification", "implementation"] }
+        }
+      }
+    },
+    "superpowers-missing-member": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "referenced_members": ["brainstorming", "verification", "implementation"], "resolved_members": ["brainstorming", "verification"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": false, "members": ["brainstorming", "verification", "implementation"], "missing_members": ["implementation"] }
+        }
+      }
+    },
+    "superpowers-untrusted-missing-members-ignored": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "referenced_members": ["brainstorming", "verification", "implementation"], "resolved_members": ["brainstorming", "verification"], "missing_members": [] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": false, "members": ["brainstorming", "verification", "implementation"], "missing_members": ["implementation"] }
+        }
+      }
+    },
+    "only-brainstorming": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "referenced_members": ["brainstorming"], "resolved_members": ["brainstorming"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "using-superpowers", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": false, "members": ["brainstorming"], "missing_members": [] }
+        }
+      }
+    },
+    "detected-but-not-confirmed": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "suite_metadata", "metadata_complete": true, "referenced_members": ["brainstorming", "verification", "implementation"] },
+          { "id": "semble", "kind": "mcp", "detection_basis": "manifest" }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_superpowers": true,
+          "has_mcp_semble": false
+        },
+        "profiles": {
+          "superpowers": { "id": "superpowers", "kind": "skill-suite", "detection_basis": "suite_metadata", "template_condition": "has_skill_superpowers", "detected": true, "confirmed": true, "complete": true },
+          "semble": { "id": "semble", "kind": "mcp", "detection_basis": "manifest", "template_condition": "has_mcp_semble", "detected": true, "confirmed": false }
+        }
+      }
+    },
+    "artifact-group-one-member": {
+      "input": {
+        "detected": [
+          { "id": "documents", "kind": "skill", "detection_basis": "manifest" }
+        ],
+        "confirmed": ["documents"]
+      },
+      "expected": {
+        "conditions": {
+          "has_skill_artifacts": true
+        },
+        "profiles": {
+          "documents": { "id": "documents", "kind": "skill", "detection_basis": "manifest", "template_condition": "has_skill_artifacts", "detected": true, "confirmed": true }
+        }
+      }
+    },
+    "unknown-detection-name": {
+      "input": {
+        "detected": [
+          { "id": "frobnicate", "kind": "skill", "detection_basis": "manifest" }
+        ],
+        "confirmed": ["frobnicate"]
+      },
+      "expected": {
+        "error": "unknown_capability_id"
+      }
+    },
+    "missing-required-field": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite" }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "error": "missing_capability_field"
+      }
+    },
+    "invalid-kind": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "mcp", "detection_basis": "suite_metadata", "metadata_complete": true, "referenced_members": ["brainstorming"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "error": "invalid_capability_kind"
+      }
+    },
+    "invalid-detection-basis": {
+      "input": {
+        "detected": [
+          { "id": "superpowers", "kind": "skill-suite", "detection_basis": "vibes", "referenced_members": ["brainstorming", "verification"] }
+        ],
+        "confirmed": ["superpowers"]
+      },
+      "expected": {
+        "error": "invalid_detection_basis"
+      }
+    },
+    "malformed-profile-entry": {
+      "input": {
+        "detected": [
+          null
+        ],
+        "confirmed": []
+      },
+      "expected": {
+        "error": "invalid_capability_profile"
+      }
+    }
+  }
+}

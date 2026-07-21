@@ -79,4 +79,10 @@ Priority: 本文件是项目级最高治理规则, 定义安全红线, 工作模
 - **[红线] 目标环境必须显式声明**: 执行写操作前必须先声明目标环境 (test/prod); 未明确授权 prod 时默认仅 test 通过.
 - **[红线] 生产连接信息不进仓库**: 真实生产凭据, 主机名禁止出现在仓库配置文件; 用户级私有覆盖文件由本地维护并保持忽略.
 - **[强制] 执行类工具默认安全层**: 执行类工具默认开启安全约束, 包括高危动作确认和审计记录.
+
+{{#has_workflow_superpowers_and_openspec}}
+### 3.5 工作流互斥
+
+- **[红线] Superpowers 与 OpenSpec 互斥**: 同一任务不得交叉使用 Superpowers 与 OpenSpec; 任一工作流执行中不得调用或切换到另一工作流. 用户同时请求两者时停止, 不预选其中之一, 并要求用户二选一.
+{{/has_workflow_superpowers_and_openspec}}
 <!-- /source: template/base -->

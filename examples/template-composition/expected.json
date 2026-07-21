@@ -1,0 +1,165 @@
+{
+  "kind": "template-composition-cases",
+  "scalars": {
+    "PROJECT_NAME": "demo",
+    "VERSION": "1.0",
+    "DATE": "2026-07-21",
+    "SCOPE": "Demo",
+    "DOMAIN": "demo",
+    "ROLE": "demo",
+    "PRIORITIES": "服务可用性 > 证据可信度",
+    "PROJECT_DESCRIPTION": "demo",
+    "DIRS_TABLE": "- | -",
+    "REFERENCES_SECTION": "- none",
+    "SCRIPTS_TABLE": "- | -",
+    "TOPOLOGY_SECTION": "n/a",
+    "LANGUAGE_CODE_STANDARDS": "generic",
+    "CAPABILITIES_SUMMARY": "(none)",
+    "LANGUAGE": "Go",
+    "FRAMEWORK": "-",
+    "BUILD_SYSTEM": "go",
+    "ENTRY_POINTS": "main.go",
+    "ARCH_PATTERN": "modular",
+    "ARCH_CONFIDENCE": "HIGH",
+    "API_FRAMEWORKS": "-",
+    "API_ROUTE_PATHS": "-",
+    "API_SCHEMA_FILES": "-",
+    "API_AUTH_ENTRYPOINTS": "-",
+    "API_TEST_PATHS": "-",
+    "API_CONFIDENCE": "UNKNOWN",
+    "DB_DRIVERS": "-",
+    "DB_TYPE": "-",
+    "MIGRATION_TOOL": "-",
+    "HAS_DOCKERFILE": "no",
+    "HAS_K8S": "no",
+    "HAS_TERRAFORM": "no",
+    "CI_PIPELINE": "-",
+    "LOG_LOCATIONS": "-",
+    "MONITORING_TOOLS": "-",
+    "ALERT_CONFIGS": "-",
+    "USER_REDLINES_CODE": "",
+    "USER_REDLINES_DATABASE": "",
+    "USER_REDLINES_API": "",
+    "USER_REDLINES_DEPLOY": "",
+    "USER_REDLINES_MAINTENANCE": ""
+  },
+  "cases": {
+    "minimal-no-capabilities": {
+      "input": {
+        "dimensions": [
+          "code"
+        ],
+        "conditions": {}
+      },
+      "expected": {
+        "unresolved_tokens": 0,
+        "unbalanced_conditions": 0,
+        "mutex_red_lines": 0,
+        "agents_has_openspec_reference": false,
+        "agents_has_superpowers_reference": false
+      }
+    },
+    "only-superpowers": {
+      "input": {
+        "dimensions": [
+          "code"
+        ],
+        "conditions": {
+          "has_skill_superpowers": true,
+          "has_workflow_superpowers_and_openspec": false
+        }
+      },
+      "expected": {
+        "unresolved_tokens": 0,
+        "unbalanced_conditions": 0,
+        "mutex_red_lines": 0,
+        "agents_has_superpowers_reference": true,
+        "agents_has_openspec_reference": false,
+        "agents_has_superpowers_reference_in_mutex": false
+      }
+    },
+    "only-openspec": {
+      "input": {
+        "dimensions": [
+          "code"
+        ],
+        "conditions": {
+          "has_workflow_openspec": true,
+          "has_workflow_superpowers_and_openspec": false
+        }
+      },
+      "expected": {
+        "unresolved_tokens": 0,
+        "unbalanced_conditions": 0,
+        "mutex_red_lines": 0,
+        "agents_has_openspec_reference": true,
+        "agents_has_superpowers_reference": false,
+        "agents_has_openspec_reference_in_mutex": false
+      }
+    },
+    "both-confirmed": {
+      "input": {
+        "dimensions": [
+          "code"
+        ],
+        "conditions": {
+          "has_skill_superpowers": true,
+          "has_workflow_openspec": true,
+          "has_workflow_superpowers_and_openspec": true
+        }
+      },
+      "expected": {
+        "unresolved_tokens": 0,
+        "unbalanced_conditions": 0,
+        "mutex_red_lines": 1,
+        "agents_has_mutex_body": true,
+        "agents_mutex_reference_count": 1
+      }
+    },
+    "multi-dimension": {
+      "input": {
+        "dimensions": [
+          "code",
+          "database",
+          "api",
+          "deploy"
+        ],
+        "conditions": {
+          "has_db": true,
+          "has_api": true,
+          "has_deploy": true
+        }
+      },
+      "expected": {
+        "unresolved_tokens": 0,
+        "unbalanced_conditions": 0,
+        "dim_sections_under_dimension_facts": true,
+        "capabilities_after_dimensions": true
+      }
+    },
+    "unknown-dimension": {
+      "input": {
+        "dimensions": [
+          "code",
+          "frobnicate"
+        ],
+        "conditions": {}
+      },
+      "expected": {
+        "dimension_error": "unknown dimension: frobnicate"
+      }
+    },
+    "duplicate-dimension": {
+      "input": {
+        "dimensions": [
+          "code",
+          "code"
+        ],
+        "conditions": {}
+      },
+      "expected": {
+        "dimension_error": "duplicate dimension: code"
+      }
+    }
+  }
+}

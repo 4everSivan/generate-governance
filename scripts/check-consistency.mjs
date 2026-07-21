@@ -2,6 +2,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { parseCapabilityMappings, buildMapping, capabilityKinds } from './capability-map.mjs'
 
 const root = process.cwd()
 const errors = []
@@ -187,15 +188,14 @@ function checkToolEntryTemplates() {
   }
 
   const agentsTemplate = read('templates/governance/agents/base.md')
-  for (const sharedToken of ['{{CAPABILITIES_SUMMARY}}', '{{SKILLS_INDEX}}']) {
-    if (!agentsTemplate.includes(sharedToken)) {
-      fail(`AGENTS template missing shared capability token: ${sharedToken}`)
-    }
-    for (const tool of supportedToolEntries) {
-      const toolTemplate = read(`templates/governance/tool-entry/${tool}.md`)
-      if (toolTemplate.includes(sharedToken)) {
-        fail(`Tool entry ${tool} duplicates AGENTS shared token: ${sharedToken}`)
-      }
+  const sharedToken = '{{CAPABILITIES_SUMMARY}}'
+  if (!agentsTemplate.includes(sharedToken)) {
+    fail(`AGENTS template missing shared capability token: ${sharedToken}`)
+  }
+  for (const tool of supportedToolEntries) {
+    const toolTemplate = read(`templates/governance/tool-entry/${tool}.md`)
+    if (toolTemplate.includes(sharedToken)) {
+      fail(`Tool entry ${tool} duplicates AGENTS shared token: ${sharedToken}`)
     }
   }
 
@@ -505,9 +505,250 @@ function checkConsolidatedConfirmationContract() {
   }
 }
 
+// Collect every {{#has_mcp_*}} / {{#has_skill_*}} / {{#has_workflow_*}} capability
+// condition token actually used in templates. Dimension inline tokens (has_db,
+// has_api, has_deploy, has_maintenance) are NOT capability tokens.
+function extractCapabilityConditionTokens(templateFiles) {
+  const tokens = new Set()
+  for (const file of templateFiles) {
+    const content = read(file)
+    for (const match of content.matchAll(/\{\{#(has_(?:mcp|skill|workflow)_[a-z0-9_-]+)\}\}/gi)) {
+      tokens.add(match[1])
+    }
+  }
+  return tokens
+}
+
+function checkCapabilityMappings() {
+  const skillMd = read('SKILL.md')
+  const { rows, duplicateDetections, duplicateIds, derivedTokens, aggregateBuckets } = parseCapabilityMappings(skillMd)
+  const mappings = buildMapping(rows)
+  const templateFiles = walk('templates').filter((file) => file.endsWith('.md'))
+  const usedTokens = extractCapabilityConditionTokens(templateFiles)
+
+  if (rows.length === 0) {
+    fail('Capability mapping table is missing from SKILL.md Phase 2')
+    return
+  }
+
+  // Surface duplicate detection-name declarations (a later row used to silently
+  // overwrite an earlier one). This is checked from raw rows, not the Map.
+  for (const dup of duplicateDetections) {
+    const rendered = dup.declarations
+      .map((decl) => `${decl.id}/${decl.kind}/${decl.token}/${decl.group ?? '-'}`)
+      .join(', ')
+    fail(`Capability detection name ${dup.detectionName} is declared more than once: ${rendered}`)
+  }
+
+  // Surface canonical ids declared with conflicting token/kind/group, and kinds
+  // outside the CapabilityProfile contract (mcp|skill|skill-suite|workflow).
+  for (const dup of duplicateIds) {
+    const rendered = dup.declarations
+      .map((decl) => `${decl.kind}/${decl.token}/${decl.group ?? '-'}`)
+      .join(', ')
+    fail(`Capability id ${dup.id} is declared with conflicting kind/token/group: ${rendered}`)
+  }
+  for (const row of rows) {
+    if (!capabilityKinds.includes(row.kind)) {
+      fail(`Capability id ${row.id} declares unknown kind: ${row.kind}`)
+    }
+  }
+
+  // Every has_mcp_* / has_skill_* / has_workflow_* token used in a template must
+  // be declared in the mapping table or as a derived condition.
+  for (const token of usedTokens) {
+    const isDeclared = [...mappings.values()].some((entry) => entry.token === token) || derivedTokens.has(token)
+    if (!isDeclared) {
+      fail(`Capability condition token {{#${token}}} is used in a template but has no mapping in SKILL.md`)
+    }
+  }
+
+  // Every mapped token must be consumed by at least one template. Derived
+  // conditions are gated by their dependency logic, not presence, so they are
+  // exempt from the must-be-consumed rule unless a template actually uses them.
+  const declaredTokens = new Set([...mappings.values()].map((entry) => entry.token))
+  for (const token of declaredTokens) {
+    if (!usedTokens.has(token)) {
+      fail(`Capability condition token {{#${token}}} is declared in the mapping but consumed by no template`)
+    }
+  }
+
+  // Grouped capabilities must declare their aggregation semantics.
+  for (const [, bucket] of aggregateBuckets) {
+    if (!['all', 'any'].includes(bucket.semantics)) {
+      fail(`Capability group ${bucket.id} must declare 'all' or 'any' aggregation semantics`)
+    }
+    if (bucket.members.length < 2) {
+      fail(`Capability group ${bucket.id} declares a group but has fewer than 2 members`)
+    }
+  }
+}
+
+function checkCapabilityMappingParserContract() {
+  const repeatedDetection = [
+    '| `same-name` | `first-id` | `skill` | `has_skill_example` |',
+    '| `same-name` | `second-id` | `skill` | `has_skill_example` |',
+  ].join('\n')
+  const detectionResult = parseCapabilityMappings(repeatedDetection)
+  if (detectionResult.duplicateDetections.length !== 1) {
+    fail('Capability mapping parser must reject a repeated detection name even when its token is unchanged')
+  }
+
+  const conflictingGroup = [
+    '| `plain-alias` | `shared-id` | `skill` | `has_skill_example` |',
+    '# capability: examples (any)',
+    '| `grouped-alias` | `shared-id` | `skill` | `has_skill_example` |',
+    '# /capability',
+  ].join('\n')
+  const idResult = parseCapabilityMappings(conflictingGroup)
+  if (idResult.duplicateIds.length !== 1) {
+    fail('Capability mapping parser must reject a canonical id declared with conflicting groups')
+  }
+}
+
+function checkTemplateLayering() {
+  const skillMd = read('SKILL.md')
+  const agents = read('templates/governance/agents/base.md')
+  const constitution = read('templates/governance/constitution/base.md')
+
+  // AGENTS base must contain exactly one dimension-section insertion point.
+  const dimensionMarkers = agents.match(/\{\{DIMENSION_SECTIONS\}\}/g) ?? []
+  if (dimensionMarkers.length !== 1) {
+    fail(`AGENTS base must contain exactly one {{DIMENSION_SECTIONS}}, found ${dimensionMarkers.length}`)
+  }
+
+  // {{DIMENSION_SECTIONS}} must precede the confirmed-capabilities section.
+  const dimIdx = agents.indexOf('{{DIMENSION_SECTIONS}}')
+  const capIdx = agents.indexOf('{{CAPABILITIES_SUMMARY}}')
+  if (dimIdx !== -1 && capIdx !== -1 && dimIdx > capIdx) {
+    fail('{{DIMENSION_SECTIONS}} must precede the confirmed-capabilities section in AGENTS base')
+  }
+
+  // Abandoned tokens must not appear anywhere in SKILL or templates.
+  const abandoned = ['{{SKILLS_INDEX}}', '{{TOOL_NAME}}', 'capability_scan.skills', '{{DIM_INDEX}}']
+  for (const token of abandoned) {
+    if (skillMd.includes(token)) {
+      fail(`Abandoned token ${token} still present in SKILL.md`)
+    }
+    if (agents.includes(token)) {
+      fail(`Abandoned token ${token} still present in agents/base.md`)
+    }
+  }
+  // {{#dim-*}} / {{/dim-*}} conditional block tags must not appear anywhere.
+  const allTemplateFiles = walk('templates').filter((file) => file.endsWith('.md'))
+  for (const file of [...allTemplateFiles, 'SKILL.md']) {
+    const content = file === 'SKILL.md' ? skillMd : read(file)
+    const dimBlock = content.match(/\{\{#?dim-[a-z]+\}\}/i)
+    if (dimBlock) {
+      fail(`Abandoned {{#dim-*}} conditional tag present in ${file}`)
+    }
+  }
+
+  // Headroom capability block must not restate the constitution evidence red line.
+  const headroomMatch = agents.match(/\{\{#has_mcp_headroom\}\}([\s\S]*?)\{\{\/has_mcp_headroom\}\}/)
+  if (headroomMatch && /摘要不替代证据/.test(headroomMatch[1])) {
+    fail('Headroom block must not duplicate the constitution "摘要不替代证据" red line')
+  }
+
+  // Mutual-exclusion rule body must appear in the constitution at most once,
+  // and only inside the Superpowers+OpenSpec combined condition.
+  const mutexBody = 'Superpowers 与 OpenSpec 互斥'
+  const constitutionMutex = constitution.match(new RegExp(mutexBody, 'g')) ?? []
+  if (constitutionMutex.length > 1) {
+    fail(`Constitution must define the mutual-exclusion red line at most once, found ${constitutionMutex.length}`)
+  }
+  if (constitutionMutex.length === 1 && !/\{\{#has_workflow_superpowers_and_openspec\}\}/.test(constitution)) {
+    fail('Constitution mutual-exclusion red line must be gated by {{#has_workflow_superpowers_and_openspec}}')
+  }
+
+  // AGENTS may reference the mutex only inside the combined condition block,
+  // and only as a cross-reference (never the full red-line body). Count
+  // occurrences of the mutex phrase; at most one is allowed, and it must be
+  // inside the {{#has_workflow_superpowers_and_openspec}} block.
+  const agentsMutex = agents.match(new RegExp(mutexBody, 'g')) ?? []
+  if (agentsMutex.length > 1) {
+    fail(`AGENTS must reference the mutual-exclusion red line at most once, found ${agentsMutex.length}`)
+  }
+  if (agentsMutex.length === 1) {
+    const combinedBlock = agents.match(/\{\{#has_workflow_superpowers_and_openspec\}\}([\s\S]*?)\{\{\/has_workflow_superpowers_and_openspec\}\}/)
+    if (!combinedBlock || !combinedBlock[1].includes(mutexBody)) {
+      fail('AGENTS mutex reference must live inside {{#has_workflow_superpowers_and_openspec}} block')
+    }
+  }
+
+  // dim templates must start with an H3 heading (the base H2 container holds them).
+  // Leading HTML source comments are skipped before checking the first real line.
+  for (const dimension of parseDimensions(read('workflow-analyze.js'))) {
+    const dimFile = `templates/governance/agents/dim-${dimension}.md`
+    if (!exists(dimFile)) continue
+    const dimContent = read(dimFile).replace(/^<!--[^>]*-->\s*/, '').trimStart()
+    if (!/^#{3}\s/.test(dimContent)) {
+      fail(`agents/dim-${dimension}.md must start with an H3 heading`)
+    }
+  }
+}
+
+function checkSembleFirstContract() {
+  const skillMd = read('SKILL.md')
+  // allowed-tools must include the semble MCP tools so the Phase 1-D path can
+  // use them when available (otherwise the skill's own semble-first rule is
+  // unreachable in environments that have semble but no Workflow).
+  for (const tool of ['mcp__semble__search', 'mcp__semble__find_related']) {
+    if (!skillMd.includes(`  - ${tool}\n`)) {
+      fail(`SKILL.md allowed-tools must include ${tool} for the Phase 1-D semble-first path`)
+    }
+  }
+  // The Phase 1-D path must describe the semble-first selection, not treat
+  // Grep/Glob/Read as the unconditional default.
+  const degradedSection = skillMd.indexOf('### Phase 1-D: Codex 降级路径')
+  if (degradedSection === -1) {
+    fail('SKILL.md missing Phase 1-D degraded path section')
+    return
+  }
+  const section = skillMd.slice(degradedSection, skillMd.indexOf('## Phase 2', degradedSection))
+  if (!/semble.+MCP/.test(section) || !/mcp__semble__search/.test(section)) {
+    fail('Phase 1-D must detect semble MCP and prefer semantic search over unconditional Grep/Glob/Read')
+  }
+}
+
+function checkDocConsistency() {
+  const readme = read('README.md')
+  const checklist = read('docs/review-checklist.md')
+  const changelog = read('CHANGELOG.md')
+
+  if (!readme.includes('已确认环境能力策略')) {
+    fail('README must declare AGENTS responsibility for project facts and confirmed capability policies')
+  }
+
+  for (const token of ['{{SKILLS_INDEX}}', '{{TOOL_NAME}}', '{{DIM_INDEX}}', 'capability_scan.skills']) {
+    if (readme.includes(token)) {
+      fail(`README still references abandoned token: ${token}`)
+    }
+  }
+
+  for (const fragment of [
+    'checkCapabilityMappings',
+    'checkTemplateLayering',
+    'template-contract.mjs',
+    'Workflow transitions',
+    'Superpowers completeness',
+    'File strategies',
+  ]) {
+    if (!checklist.includes(fragment)) {
+      fail(`Review checklist missing review item: ${fragment}`)
+    }
+  }
+
+  const unreleased = changelog.match(/## \[Unreleased\]([\s\S]*?)(?=\n## \[|\n$|$)/)
+  if (!unreleased || !/规则分层收敛/.test(unreleased[1])) {
+    fail('CHANGELOG [Unreleased] must summarize the contract-repair changes')
+  }
+}
+
 function checkWorkflowSkillRoutingContract() {
   const skillMd = read('SKILL.md')
   const agents = read('templates/governance/agents/base.md')
+  const constitution = read('templates/governance/constitution/base.md')
   const readme = read('README.md')
   const checklist = read('docs/review-checklist.md')
 
@@ -521,20 +762,47 @@ function checkWorkflowSkillRoutingContract() {
     }
   }
 
+  // The mutual-exclusion red line body lives in the constitution, gated by the
+  // combined condition. AGENTS must only reference it, not restate the body.
+  if (!constitution.includes('{{#has_workflow_superpowers_and_openspec}}')) {
+    fail('Constitution must gate the mutual-exclusion red line with {{#has_workflow_superpowers_and_openspec}}')
+  }
+  for (const fragment of [
+    'Superpowers 与 OpenSpec 互斥',
+    '不得调用或切换到另一工作流',
+    '用户同时请求两者时停止',
+  ]) {
+    if (!constitution.includes(fragment)) {
+      fail(`Constitution missing mutual-exclusion red line fragment: ${fragment}`)
+    }
+  }
+
   const requiredAgentFragments = [
     '小型任务不得因 Superpowers 可用而自动进入',
     '完整遵循已安装版本的内部 skill 规则与后续调用',
     '开始 `grill-me` 前必须获得用户明确确认',
-    'Superpowers 与 OpenSpec 互斥',
-    'OpenSpec 任务不得调用任何 Superpowers skill',
-    '用户同时要求两者时停止, 不预选其中之一, 并要求用户二选一',
     '不得自动安装或初始化',
-    '不得静默切换到 Superpowers',
+    '不得保持大型任务范围改走其他工作流',
   ]
   for (const fragment of requiredAgentFragments) {
     if (!agents.includes(fragment)) {
       fail(`AGENTS template missing workflow skill routing safeguard: ${fragment}`)
     }
+  }
+
+  // The single-party Superpowers/OpenSpec blocks must NOT name the other
+  // (unconfirmed) workflow. Only the combined block may reference the mutex.
+  const superpowersBlock = agents.match(/\{\{#has_skill_superpowers\}\}([\s\S]*?)\{\{\/has_skill_superpowers\}\}/)
+  if (superpowersBlock && /OpenSpec/.test(superpowersBlock[1])) {
+    fail('Superpowers single-party block must not name OpenSpec (violates conservative generation)')
+  }
+  const openspecBlock = agents.match(/\{\{#has_workflow_openspec\}\}([\s\S]*?)\{\{\/has_workflow_openspec\}\}/)
+  if (openspecBlock && /Superpowers/.test(openspecBlock[1])) {
+    fail('OpenSpec single-party block must not name Superpowers (violates conservative generation)')
+  }
+  // The combined block must exist in AGENTS and reference the constitution mutex.
+  if (!agents.includes('{{#has_workflow_superpowers_and_openspec}}')) {
+    fail('AGENTS must gate its mutex reference with {{#has_workflow_superpowers_and_openspec}}')
   }
 
   if (agents.includes('{{#has_skill_brainstorming}}')) {
@@ -566,7 +834,12 @@ checkKimiDocumentationContract()
 checkInstructionHierarchy()
 checkReadmeVersion()
 checkConsolidatedConfirmationContract()
+checkCapabilityMappings()
+checkCapabilityMappingParserContract()
+checkTemplateLayering()
 checkWorkflowSkillRoutingContract()
+checkSembleFirstContract()
+checkDocConsistency()
 
 if (errors.length > 0) {
   console.error('Consistency check failed:')

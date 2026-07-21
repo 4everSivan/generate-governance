@@ -1,13 +1,13 @@
 <!-- source: template/base -->
 # {{PROJECT_NAME}} 项目事实
 
-本文件是 `constitution.md` 的项目实施层, 是所有 AI 工具的共享基线. 只维护**项目事实**: 目录/路径, 脚本命令, 数据模型, 服务拓扑, 领域知识索引.
+本文件是 `constitution.md` 的项目实施层, 是所有 AI 工具的共享基线. 维护**项目事实** (目录/路径, 脚本命令, 数据模型, 服务拓扑, 领域知识索引) 与**已确认环境能力策略** (MCP/skill/workflow capability 的使用边界).
 
 边界 (本文件不重复, 只引用):
 
-- 红线 / 证据分级 / 工作模式定义 → `constitution.md`
-- 领域知识与排查程序 → `.agents/skills/*`
-- 输出格式 / 模板 / 自审清单 → `templates/*`
+- 红线 / 证据分级 / 工作模式定义 -> `constitution.md`
+- 领域知识与排查程序 -> `.agents/skills/*`
+- 输出格式 / 模板 / 自审清单 -> `templates/*`
 
 ---
 
@@ -27,7 +27,7 @@
 
 ## 3. 规则层级与单一事实源映射
 
-优先级 (高→低): 平台/System/Developer/工具强制安全指令 > `constitution.md` > 本文件 `AGENTS.md` > 工具入口 > generated subagent body > `.agents/skills/*` > 设计说明 > 单次偏好.
+优先级 (高->低): 平台/System/Developer/工具强制安全指令 > `constitution.md` > 本文件 `AGENTS.md` > 工具入口 > generated subagent body > `.agents/skills/*` > 设计说明 > 单次偏好.
 
 冲突裁决: 项目路径/脚本/数据入口以本文件为准; 用户授权不能覆盖 `constitution.md` 红线.
 
@@ -36,7 +36,7 @@
 | 概念 | 唯一归属 |
 |------|---------|
 | 红线 / 证据分级 / 工作模式 | `constitution.md` |
-| 项目事实 / 路径 / 脚本 / 拓扑 | `AGENTS.md` (本文件) |
+| 项目事实 / 路径 / 脚本 / 拓扑 / 已确认环境能力策略 | `AGENTS.md` (本文件) |
 | 领域知识 + 排查程序 | `.agents/skills/*` |
 | 输出格式 / 模板 / 自审清单 | `templates/*` |
 
@@ -82,15 +82,19 @@
 
 ---
 
-## 8. 已确认环境能力
+## 8. 治理维度事实
 
-以下规则仅在生成时检测到对应 MCP/skill/workflow capability 且经用户确认后出现. 未出现的能力不得被视为项目强制依赖.
+已确认维度的项目事实, 按 code、database、api、deploy、maintenance 固定顺序组合, 仅插入已确认维度.
+
+{{DIMENSION_SECTIONS}}
+
+---
+
+## 9. 已确认环境能力
+
+以下能力清单仅列出名称、确认状态与检测依据; 规则正文由后续条件块提供. 未出现的能力不得被视为项目强制依赖.
 
 {{CAPABILITIES_SUMMARY}}
-
-### Skill 索引
-
-{{SKILLS_INDEX}}
 
 {{#has_mcp_semble}}
 ### Semble 代码搜索
@@ -118,7 +122,7 @@
 - **[强制] 大内容先压缩**: 大型日志, 搜索结果, 长文件内容或大 diff 进入推理前, 优先使用 Headroom 压缩.
 - **[强制] 压缩摘要保真**: 摘要必须保留用户最新目标, 已确认约束, 已改文件, 未完成事项, 验证结果, 关键决策和阻塞点.
 - **[强制] 可追溯**: 压缩结果带 hash 时, 后续需要细节必须 retrieve 原文; 不得凭摘要补造细节.
-- **[红线] 摘要不替代证据**: 压缩摘要只能辅助推理, 不能替代原始日志, 测试输出或源码证据.
+- 证据红线遵循 `constitution.md` 事实与证据章节, 不在此重复定义.
 <!-- source: capability-detect/mcp-headroom, confirmed: true -->
 {{/has_mcp_headroom}}
 
@@ -149,13 +153,34 @@
 <!-- source: capability-detect/skill-architecture, confirmed: true -->
 {{/has_skill_architecture}}
 
+{{#has_skill_artifacts}}
+### 文档与制品 Skills
+
+- **[默认] 专用格式使用专用 skill**: 生成或编辑 Word, PDF, 表格或演示文稿时, 使用对应文档类 skill.
+- **[强制] 视觉制品需验证**: 对布局敏感的文档, PDF, 表格和演示文稿交付前必须渲染或打开检查.
+<!-- source: capability-detect/skill-artifacts, confirmed: true -->
+{{/has_skill_artifacts}}
+
+{{#has_skill_pua}}
+### 失败恢复 Skill
+
+- **[例外] 仅失败恢复时启用**: 同一任务失败多次, 即将放弃, 或用户明确要求换路/穷尽方案时, 才使用失败恢复 skill.
+- **[强制] 不改变项目语气**: 该 skill 只用于执行恢复, 不得污染项目文档, 用户沟通语气或正常协作流程.
+<!-- source: capability-detect/skill-pua, confirmed: true -->
+{{/has_skill_pua}}
+
+---
+
+## 10. 已确认工作流策略
+
+工作流能力的适用场景与入口. 互斥红线由 `constitution.md` 唯一定义, 本节不重复正文.
+
 {{#has_skill_superpowers}}
 ### Superpowers 工作流
 
 - **[强制] 场景入口**: 原因未知且需要复现或根因诊断的 bug, 以及边界稳定但需要多步骤实施的中型任务, 进入 Superpowers.
 - **[强制] 小型任务不自动进入**: 目标与修法明确, 局部, 低风险且容易回滚的小型任务直接执行; 小型任务不得因 Superpowers 可用而自动进入.
 - **[强制] 遵循原生链路**: 一旦选择 Superpowers, 完整遵循已安装版本的内部 skill 规则与后续调用, 不施加“最小 skill 集”限制.
-- **[红线] 禁止与 OpenSpec 交叉**: Superpowers 与 OpenSpec 互斥; Superpowers 任务不得调用 OpenSpec, 也不得在执行中切换为 OpenSpec. 用户同时要求两者时停止, 不预选其中之一, 并要求用户二选一.
 <!-- source: capability-detect/skill-superpowers, confirmed: true -->
 {{/has_skill_superpowers}}
 
@@ -172,25 +197,13 @@
 ### OpenSpec / OPSX 工作流
 
 - **[强制] 大型任务入口**: 大型重构, 从 0 构建, 新功能模块, 公共 API/数据模型/跨模块边界变化或需要跨会话维护规格的任务使用 OpenSpec. 按影响形态判断, 不按文件数或代码行数判断.
-- **[强制] 独立工作流**: 进入 OpenSpec 后使用 OPSX 管理规格, 设计, 任务, 实施与归档; Superpowers 与 OpenSpec 互斥, OpenSpec 任务不得调用任何 Superpowers skill.
+- **[强制] 独立工作流**: 进入 OpenSpec 后使用 OPSX 管理规格, 设计, 任务, 实施与归档.
 - **[强制] 安装与初始化需授权**: 未安装时只提出安装建议; 已安装但项目未初始化时, 执行 `openspec init` 前先取得用户确认; 不得自动安装或初始化.
-- **[强制] 不静默降级**: 用户拒绝安装或初始化时, 再确认是改用非 OpenSpec 路径还是取消; 不得静默切换到 Superpowers.
+- **[强制] 不静默降级**: 用户拒绝安装或初始化且任务范围不变时, 只能取消或延期; 用户缩小范围时必须重新分类并重新确认工作流. 不得保持大型任务范围改走其他工作流.
 <!-- source: capability-detect/workflow-openspec, confirmed: true -->
 {{/has_workflow_openspec}}
 
-{{#has_skill_artifacts}}
-### 文档与制品 Skills
-
-- **[默认] 专用格式使用专用 skill**: 生成或编辑 Word, PDF, 表格或演示文稿时, 使用对应文档类 skill.
-- **[强制] 视觉制品需验证**: 对布局敏感的文档, PDF, 表格和演示文稿交付前必须渲染或打开检查.
-<!-- source: capability-detect/skill-artifacts, confirmed: true -->
-{{/has_skill_artifacts}}
-
-{{#has_skill_pua}}
-### 失败恢复 Skill
-
-- **[例外] 仅失败恢复时启用**: 同一任务失败多次, 即将放弃, 或用户明确要求换路/穷尽方案时, 才使用失败恢复 skill.
-- **[强制] 不改变项目语气**: 该 skill 只用于执行恢复, 不得污染项目文档, 用户沟通语气或正常协作流程.
-<!-- source: capability-detect/skill-pua, confirmed: true -->
-{{/has_skill_pua}}
+{{#has_workflow_superpowers_and_openspec}}
+> Superpowers 与 OpenSpec 互斥, 详见 `constitution.md` 工作流互斥红线.
+{{/has_workflow_superpowers_and_openspec}}
 <!-- /source: template/base -->

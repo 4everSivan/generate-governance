@@ -4,8 +4,8 @@
 
 这个项目解决的问题不是“生成一份通用说明文档”, 而是把一个项目中容易散落在口头约定、README、工具记忆和个人偏好里的 AI 协作规则, 收敛成三个明确分层的文件:
 
-- `constitution.md`: 项目最高优先级的安全红线、工作模式和行为边界。
-- `AGENTS.md`: 项目事实层, 保存目录、脚本、技术栈、拓扑和工具策略。
+- `constitution.md`: 项目最高优先级的安全红线、工作模式和行为边界 (含条件成立后的 workflow 互斥红线)。
+- `AGENTS.md`: 项目事实与已确认环境能力策略层, 保存目录、脚本、技术栈、拓扑、能力使用边界与工作流路由策略。
 - `{TOOL}.md`: 面向具体 AI 工具的入口文件, 例如 `CLAUDE.md`, `CODEX.md`, `GEMINI.md`, `KIRO.md`, `KIMI.md`。Kimi 目标额外生成原生桥接入口 `.kimi-code/AGENTS.md`。
 
 生成结果强调两点:
@@ -197,10 +197,12 @@ templates/governance/
 工作流类能力仅在检测到且经用户确认后启用, 路由遵循以下规则:
 
 - **小任务默认直接执行**: 明确且范围小的任务不走任何工作流, 直接完成。
-- **`grill-me`**: 适用于小型但有歧义的任务; 每次使用前需取得用户任务级确认, 确认后可重新分类为直接执行或更重的工作流。
-- **Superpowers**: 适用于原因未知的 bug 与中型任务; 必须检测到完整 suite (不能仅凭单个 `brainstorming` 成员判定), 进入后遵循其完整内部链路。
-- **OpenSpec / OPSX**: 适用于大型重构、从 0 构建、新功能模块与系统契约变化; CLI 安装与项目初始化均需用户显式授权, 不得把 CLI 已安装等同于项目已初始化。
-- **互斥**: Superpowers 与 OpenSpec 不得在同一任务中交叉使用, 任一工作流不得调用另一个。
+- **`grill-me`**: 适用于小型但有歧义的任务; 每次使用前需取得用户任务级确认, 确认后可重新分类为直接执行或更重的工作流。降级到直接执行不需要二次确认。
+- **Superpowers**: 适用于原因未知的 bug 与中型任务; 依据已注册 suite/plugin 元数据判定完整性, 缺少元数据时 `using-superpowers` 引用的全部成员必须可解析, 任一缺失则 suite 不完整、不生成完整工作流规则。仅 `brainstorming` 不构成完整 suite。
+- **OpenSpec / OPSX**: 适用于大型重构、从 0 构建、新功能模块与系统契约变化; CLI 安装与项目初始化均需用户显式授权, 不得把 CLI 已安装等同于项目已初始化。用户拒绝安装或初始化且任务范围不变时, 只能取消或延期; 用户缩小范围时必须重新分类并重新确认工作流, 不得保持大型任务范围改走 Superpowers 或 direct。
+- **互斥**: 仅当 Superpowers 与 OpenSpec 都确认时, 在 `constitution.md` 生成唯一互斥红线 (同一任务不得交叉使用, 执行中不得调用或切换到另一工作流, 同时请求两者时停止并二选一)。只确认单方时不点名另一方。
+
+> 注: generate-governance 生成治理文档, 其中包含工作流能力的使用边界与路由策略; 它本身不充当通用工作流路由器, 也不执行运行时任务路由。
 
 ## 支持的 AI 工具
 
@@ -313,7 +315,7 @@ generate-governance/
 ├── scripts/                    # 一致性检查与离线 eval 脚本
 │   ├── check-consistency.mjs   # 仓库、模板、schema 与发布一致性
 │   └── eval-fixtures.mjs       # 离线 fixture evaluator
-├── examples/                   # 离线 eval fixture (5 组, 23 场景)
+├── examples/                   # 离线 eval fixture (7 组, 60 场景)
 ├── templates/governance/       # 治理文档模板
 ├── docs/review-checklist.md    # 生成结果审查清单
 └── README.md
@@ -326,12 +328,14 @@ generate-governance/
 ### 验证
 
 ```bash
-npm run check  # 仓库、模板、schema 与发布一致性
-npm run eval   # 5 组离线 fixture、23 个确定性场景
+npm run check  # 仓库、模板、schema、能力映射与发布一致性
+npm run eval   # 7 组离线 fixture、60 个确定性场景
 npm test       # check + eval + 安装器 dry-run
 ```
 
-离线 eval 只验证证据分类、维度、文件保护、工具入口契约与 workflow 路由契约，不调用模型或网络，也不代表模型质量评测。
+离线 eval 验证证据分类、维度、文件保护、工具入口契约、能力规范化、workflow 路由状态迁移与模板组合契约, 不调用模型或网络, 也不代表模型质量评测。
+
+文件策略边界: 三种策略 (merge/overwrite/skip) 是 generate-governance skill 的交互与写入契约。npm CLI 仅负责安装 skill 文件, 不执行治理文档合并。离线 eval 验证策略选择与逐文件保护边界, 不是合并引擎的端到端测试。
 
 ## License
 

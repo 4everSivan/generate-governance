@@ -15,6 +15,8 @@ allowed-tools:
   - Bash
   - Workflow
   - AskUserQuestion
+  - mcp__semble__search
+  - mcp__semble__find_related
 ---
 
 # Generate Governance
@@ -34,7 +36,7 @@ allowed-tools:
 先检测当前运行环境, 决定走哪条分析路径:
 
 - **Claude Code 路径 (Phase 1-C)**: 若当前环境提供 `Workflow` 工具, 走此路径. 用 `workflow-analyze.js` 并行 5 agent 分析, 产出结构化 project profile JSON, 交互用 `AskUserQuestion`.
-- **Codex 降级路径 (Phase 1-D)**: 若无 `Workflow` 工具 (Codex 等环境), 走此路径. 用 Grep/Glob/Read 指令式扫描目标项目, 复杂维度可选派 subagent 深入, 自行组装与 Claude Code 路径结构一致的 project profile JSON, 交互用纯文本提问.
+- **Codex 降级路径 (Phase 1-D)**: 若无 `Workflow` 工具 (Codex 等环境), 走此路径. 先检测 `semble` MCP 是否可用: 可用时优先用 `mcp__semble__search` / `mcp__semble__find_related` 做语义检索, 仅在 semble 不可用或返回上下文不足时降级到 Grep/Glob/Read 字面扫描. 复杂维度可选派 subagent 深入, 自行组装与 Claude Code 路径结构一致的 project profile JSON, 交互用纯文本提问.
 
 两条路径产出的 project profile JSON 结构必须一致 (字段名, 嵌套, enum 值对齐 `workflow-analyze.js` 的 SUMMARIZE_SCHEMA), 以保证后续确认和模板填充无差异.
 
@@ -57,9 +59,18 @@ Workflow({scriptPath: "workflow-analyze.js", args: {targetPath: "<target-path>"}
 
 不调用 `workflow-analyze.js` (它依赖 Claude Code Workflow API). 改为指令式扫描目标项目, 自行组装 project profile JSON.
 
+**1.D.0 探索工具选择**
+
+先检测当前环境是否提供 `semble` MCP:
+
+- 若可用: 代码结构理解, 实现定位, 调用关系查找等语义检索优先使用 `mcp__semble__search` / `mcp__semble__find_related`; 仅对精确字符串、全仓库字面匹配、确认符号残留, 或 semble 返回上下文不足时, 才降级到 Grep/Glob/Read.
+- 若不可用: 使用 Grep/Glob/Read 指令式扫描.
+
+此规则与该 skill 自身生成的 `{{#has_mcp_semble}}` 能力块一致 (先语义检索, 后字面扫描), 避免 Codex 路径在 semble 可用时违反用户全局 CLAUDE.md 的 semble-first 约定.
+
 **1.D.1 指令式扫描 (主)**
 
-用 Grep/Glob/Read 执行以下扫描, 覆盖 5 个分析维度:
+按 1.D.0 选定的探索工具执行以下扫描, 覆盖 5 个分析维度:
 
 - **语言与构建**: `Glob **/{go.mod,package.json,Cargo.toml,requirements.txt,pyproject.toml,Makefile,setup.py}` → 推断主语言与构建系统.
 - **依赖分类**: `Read` 依赖文件 (manifest / lock), `Grep` 关键词分类: db_driver (postgres/mysql/redis/mongo/sqlalchemy/gorm) / mq (kafka/rabbitmq/nats) / cache (redis/memcached) / http (express/gin/fastapi/axios) / auth (jwt/passport/oauth).
@@ -127,16 +138,71 @@ subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 p
 | `documents` / `pdf` / `spreadsheets` / `presentations` | 文档, PDF, 表格, 演示文稿生成与视觉验证 |
 | `pua` | 失败多次后的强制换路与穷尽方案, 仅用户明确确认时写入 |
 
+### 能力规范化映射 (CapabilityProfile)
+
+每个检测到的能力归一化为 `CapabilityProfile`, 字段:
+
+- `id`: 规范化能力 ID.
+- `kind`: `mcp` | `skill` | `skill-suite` | `workflow`.
+- `detected`: 当前环境是否检测到.
+- `confirmed`: 是否经 Phase 2 已展示结果的用户确认.
+- `detection_basis`: 检测依据 (manifest 命中, suite 元数据, CLI 可用, 初始化状态等).
+- `template_condition`: 对应模板条件 token.
+
+Superpowers 额外字段:
+
+- `complete`: 是否构成完整 suite.
+- `members`: 已发现成员 skill 列表.
+- `missing_members`: 引用但无法解析的成员.
+
+派生规则:
+
+- `detected` 不自动推出 `confirmed`; `confirmed` 只能来自 Phase 2 已展示结果的用户确认.
+- `detected` 中每一项必须是完整的 `CapabilityProfile` 对象; 非对象或缺少必填字段时直接失败, 不得静默忽略.
+- 能力条件仅在 `detected && confirmed` 时成立.
+- Superpowers 条件还必须满足 `complete === true`.
+- 组合条件由依赖能力派生, 不接受独立确认.
+
+检测名称 -> 规范能力 ID -> kind -> 模板条件 token 的唯一映射 (运行时能力映射由本表生成, 是唯一事实源):
+
+| 检测名称 / 别名 | 规范 ID | kind | 模板条件 token |
+|----------------|---------|------|---------------|
+| `semble` | `semble` | `mcp` | `has_mcp_semble` |
+| `tokensave` | `tokensave` | `mcp` | `has_mcp_tokensave` |
+| `headroom` | `headroom` | `mcp` | `has_mcp_headroom` |
+| `context7` | `context7` | `mcp` | `has_mcp_context7` |
+| `fetch` | `fetch` | `mcp` | `has_mcp_fetch` |
+| `improve-codebase-architecture` | `improve-codebase-architecture` | `skill` | `has_skill_architecture` |
+| Superpowers (using-superpowers 及其成员) | `superpowers` | `skill-suite` | `has_skill_superpowers` |
+| `grill-me` | `grill-me` | `skill` | `has_skill_grill_me` |
+| OpenSpec / OPSX | `openspec` | `workflow` | `has_workflow_openspec` |
+| `pua` | `pua` | `skill` | `has_skill_pua` |
+
+派生组合条件 (由依赖能力派生, 不接受独立确认):
+
+| 派生条件 | 依赖 |
+|----------|------|
+| `has_workflow_superpowers_and_openspec` | `has_skill_superpowers` 与 `has_workflow_openspec` 均确认 |
+
+# capability: artifacts (any)
+| `documents` | `documents` | `skill` | `has_skill_artifacts` |
+| `pdf` | `pdf` | `skill` | `has_skill_artifacts` |
+| `spreadsheets` | `spreadsheets` | `skill` | `has_skill_artifacts` |
+| `presentations` | `presentations` | `skill` | `has_skill_artifacts` |
+# /capability
+
+`artifacts` 分组以 `any` 语义聚合: 任意一个成员检测到并确认即展开 `has_skill_artifacts` 块. 派生组合条件 (如 `has_workflow_superpowers_and_openspec`) 在对应模板消费者就绪后加入, 避免产生无消费者的孤立映射.
+
 检测规则:
 
-- **Superpowers**: 按已注册 suite/plugin 元数据, 或 `using-superpowers` 与其引用的实际成员 skills 检测; 记录已发现成员. 只有 `brainstorming` 不得被视为完整 Superpowers. 未检测到完整 suite 时不得生成完整工作流规则.
+- **Superpowers**: 按已注册 suite/plugin 元数据判定完整性; 缺少元数据时, `using-superpowers` 引用的全部成员必须可解析, 且必须显式记录已解析成员 (`resolved_members`), 未提供解析结果视为全部不可解析; 任一缺失记入 `missing_members` 并令 `complete = false`. 只有 `brainstorming` 不构成完整 suite. `complete = false` 时不得生成完整工作流规则.
 - **`grill-me`**: 按精确名称或命名空间等价名称检测.
 - **OpenSpec**: 分别记录 `openspec` CLI 是否可用与目标项目是否已初始化 (`openspec/config.yaml`, `openspec/` 工作区或已生成 OPSX skills). 不得把 CLI 已安装等同于项目已初始化.
 
 能力状态必须区分:
 
-- `available`: 当前环境检测到.
-- `confirmed`: 用户确认写入生成规范.
+- `detected`: 当前环境检测到 (不自动推出 `confirmed`).
+- `confirmed`: 用户确认写入生成规范 (只能来自 Phase 2 已展示结果).
 - `skipped`: 未检测到或用户选择不写入.
 - `details`: 对 suite/工作流记录成员 skills, CLI 版本和初始化状态等已验证事实; 不得补造缺失成员或命令.
 
@@ -234,15 +300,13 @@ API 维度影响优先级:
 | `{{DOMAIN}}` | profile.domain | `后端服务` |
 | `{{ROLE}}` | profile.role | `精通 Go 的架构师` |
 | `{{PRIORITIES}}` | profile.priorities | `数据安全 > API 安全与契约兼容 > 服务可用性 > 可恢复性 > 证据可信度` (命中 api+database 时) |
-| `{{#dim-database}}...{{/dim-database}}` | 条件 block: 维度命中时展开内容 |
 | `{{#has_db}}...{{/has_db}}` | 条件 inline: 维度命中时展开 |
 | `{{USER_REDLINES_DATABASE}}` | user_input.redlines.database | 用户输入的逐条红线 |
 | `{{USER_REDLINES_API}}` | user_input.redlines.api | 用户输入的 API 维度逐条红线 |
 | `{{USER_REDLINES_CODE}}` | user_input.redlines.code | 用户输入的代码维度逐条红线 |
 | `{{USER_REDLINES_DEPLOY}}` | user_input.redlines.deploy | 用户输入的部署维度逐条红线 |
 | `{{USER_REDLINES_MAINTENANCE}}` | user_input.redlines.maintenance | 用户输入的运维维度逐条红线 |
-| `{{DIM_INDEX}}` | generator.dimension_index | 维度段章节号; base.md 固定 3.1-3.4, 维度段从 3.5 起: code 总是 3.5, 其后 database/api/deploy/maintenance 按命中顺序递增 3.6/3.7/..., 未命中不插入, 编号连续无空洞 |
-| `{{TOOL_NAME}}` | arguments.tool | `Claude Code` |
+| `{{DIMENSION_SECTIONS}}` | confirmed_dimensions | 已确认维度对应的 `agents/dim-*.md` 有序组合; 固定顺序 code、database、api、deploy、maintenance, 仅插入已确认维度 |
 
 模板中还有以下子对象占位符, 从项目画像的子字段填充:
 
@@ -275,15 +339,10 @@ API 维度影响优先级:
 | `{{API_AUTH_ENTRYPOINTS}}` | profile.api_summary.auth_entrypoints | 认证/授权入口 |
 | `{{API_TEST_PATHS}}` | profile.api_summary.test_paths | API/integration/e2e/contract 测试路径 |
 | `{{API_CONFIDENCE}}` | profile.api_summary.confidence | API 维度检测置信度 |
-| `{{SKILLS_INDEX}}` | capability_scan.skills | 技能索引列表 |
-| `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills/workflow capabilities 能力摘要 |
+| `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认能力的名称、确认状态与检测依据摘要; 不输出规则正文 |
 | `{{LANGUAGE_CODE_STANDARDS}}` | profile.language + code-standards 模板 | 语言专属编码规范, 未命中时使用 generic |
 
 **条件 block 语法:**
-- `{{#dim-database}}...{{/dim-database}}` — 命中 database 维度时展开 block 内容
-- `{{#dim-api}}...{{/dim-api}}` — 命中 api 维度时展开 block 内容
-- `{{#dim-deploy}}...{{/dim-deploy}}` — 命中 deploy 维度时展开 block 内容
-- `{{#dim-maintenance}}...{{/dim-maintenance}}` — 命中 maintenance 维度时展开 block 内容
 - `{{#has_db}}...{{/has_db}}` — 命中 database 维度时展开 inline 内容 (用于角色描述中的子句)
 - `{{#has_api}}...{{/has_api}}` — 命中 api 维度时展开 inline 内容
 - `{{#has_deploy}}...{{/has_deploy}}` — 命中 deploy 维度时展开 inline 内容
@@ -299,8 +358,9 @@ API 维度影响优先级:
 - `{{#has_workflow_openspec}}...{{/has_workflow_openspec}}` — 检测到并经用户确认 OpenSpec/OPSX 时展开
 - `{{#has_skill_artifacts}}...{{/has_skill_artifacts}}` — 检测到并经用户确认文档/表格/演示/PDF 类 skill 时展开
 - `{{#has_skill_pua}}...{{/has_skill_pua}}` — 检测到并经用户明确确认 `pua` skill 时展开
+- `{{#has_workflow_superpowers_and_openspec}}...{{/has_workflow_superpowers_and_openspec}}` - Superpowers 与 OpenSpec 均确认时展开, 生成 constitution 互斥红线
 
-维度 block 展开逻辑: 命中维度时保留 block 内容并去掉 `{{#dim-*}}` / `{{/dim-*}}` 标签; 未命中时整块删除. 能力 block 只有在 `available && confirmed` 同时成立时展开. 条件 inline (`{{#has_*}}`) 同理.
+能力 block 只有在 `detected && confirmed` 同时成立时展开 (Superpowers 还需 `complete === true`); 派生组合条件在其依赖能力均确认时成立. 条件 inline (`{{#has_*}}`) 同理. 维度内容通过 `{{DIMENSION_SECTIONS}}` 按固定顺序插入, 不使用 `{{#dim-*}}` block 标签.
 
 ### 3.3 写入输出文件
 
