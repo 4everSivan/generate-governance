@@ -84,7 +84,7 @@
 
 ## 8. 已确认环境能力
 
-以下规则仅在生成时检测到对应 MCP/skill 且经用户确认后出现. 未出现的能力不得被视为项目强制依赖.
+以下规则仅在生成时检测到对应 MCP/skill/workflow capability 且经用户确认后出现. 未出现的能力不得被视为项目强制依赖.
 
 {{CAPABILITIES_SUMMARY}}
 

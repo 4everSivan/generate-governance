@@ -26,5 +26,5 @@
 
 ## 3. 已确认环境能力
 
-本项目确认的 MCP / skills 与 Skill 索引以 `AGENTS.md` 的"已确认环境能力"为唯一来源; 本文件不重复定义. 未在其中出现的能力不得视为项目强制依赖.
+本项目确认的 MCP、skills 与 workflow capabilities, 以及 Skill 索引, 均以 `AGENTS.md` 的"已确认环境能力"为唯一来源; 本文件不重复定义. 未在其中出现的能力不得视为项目强制依赖.
 <!-- /source: template/tool-entry/codex -->

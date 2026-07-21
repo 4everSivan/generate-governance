@@ -103,7 +103,7 @@ subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 p
 - `tool`: 按 `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → (`KIMI.md` 或 `.kimi-code/AGENTS.md`) → 默认 `claude` 推荐. Kimi 双入口算一个工具; 多个不同工具并存时标记为未决选择.
 - `file_strategies`: 扫描 `constitution.md`, `AGENTS.md`, 所有工具入口及 `user-custom` 区块; 已存在文件默认建议 merge, 新文件标记 create.
 - `confirmed_dimensions`: 展示每个维度的证据与 confidence; code 始终命中, 弱证据维度必须显式标注.
-- `confirmed_capabilities`: 只列出当前环境检测到的 MCP/skills 及将启用的规则; 接受建议即确认这些能力.
+- `confirmed_capabilities`: 只列出当前环境检测到的 MCP/skills/workflow capabilities 及将启用的规则; 接受建议即确认这些能力.
 - `user_redlines`: 展示模板基线红线; 默认无额外用户红线, 可在调整时按维度补充.
 
 检测候选 MCP 服务:
@@ -276,7 +276,7 @@ API 维度影响优先级:
 | `{{API_TEST_PATHS}}` | profile.api_summary.test_paths | API/integration/e2e/contract 测试路径 |
 | `{{API_CONFIDENCE}}` | profile.api_summary.confidence | API 维度检测置信度 |
 | `{{SKILLS_INDEX}}` | capability_scan.skills | 技能索引列表 |
-| `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills 能力摘要 |
+| `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认写入的 MCP/skills/workflow capabilities 能力摘要 |
 | `{{LANGUAGE_CODE_STANDARDS}}` | profile.language + code-standards 模板 | 语言专属编码规范, 未命中时使用 generic |
 
 **条件 block 语法:**
@@ -351,8 +351,8 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 | Kimi 桥接引用的根治理文件缺失或被跳过 | 在完成摘要中列为待确认项 |
 | API 检测证据较弱 | 标记 LOW confidence, 在维度确认阶段让用户决定是否启用 api |
 | API 模板缺失 | 跳过 api 维度并报告缺失模板, 不生成半截 API 红线 |
-| 能力检测失败 | 不生成特定 MCP/skill 强制规则, 仅生成通用降级规则 |
-| 用户跳过能力确认 | 不写入特定 MCP/skill 规则 |
+| 能力检测失败 | 不生成特定 MCP/skill/workflow capability 强制规则, 仅生成通用降级规则 |
+| 用户跳过能力确认 | 不写入特定 MCP/skill/workflow capability 规则 |
 | Kimi 主入口或原生桥接模板缺失 | 停止对应入口生成并报告缺失, 不使用其他工具模板冒充 Kimi |
 | 模板文件缺失 | 降级到 skill 内置 fallback 模板 |
 | 语言编码规范模板缺失 | 使用 `code-standards/generic.md`; 若 generic 也缺失, 生成最小代码质量规则 |
@@ -369,7 +369,7 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 - [ ] 维度判定正确
 - [ ] API 维度证据已展示并由用户确认
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则
-- [ ] 用户确认的 MCP/skills 条件 block 正确展开
+- [ ] 用户确认的 MCP/skills/workflow capabilities 条件 block 正确展开
 - [ ] Phase 2 建议设置已一次性确认; 追加提问仅覆盖未决字段
 - [ ] 模板选择正确
 - [ ] 语言专属编码规范模板选择正确

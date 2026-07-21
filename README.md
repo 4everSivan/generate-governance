@@ -11,7 +11,7 @@
 生成结果强调两点:
 
 - **证据优先**: 项目事实来自代码库扫描、用户确认和显式输入; 推断内容需要标注边界。
-- **环境感知**: MCP 服务和 skills 只有在当前环境检测到且经用户确认后, 才会写入项目规范, 避免把个人机器上的能力误写成团队强制依赖。
+- **环境感知**: MCP 服务、skills 与 workflow capabilities 只有在当前环境检测到且经用户确认后, 才会写入项目规范, 避免把个人机器上的能力误写成团队强制依赖。
 
 ## 适用场景
 
@@ -23,7 +23,7 @@
 ## 设计原则
 
 - **分层治理**: 红线归 `constitution.md`, 项目事实归 `AGENTS.md`, 工具差异归 `{TOOL}.md`, 避免同一规则在多个文件里互相冲突。
-- **保守生成**: 检测不到的能力不生成强制规则; 用户未确认的 MCP / skill 不写入项目规范; 已存在的治理文档未经确认不覆盖。
+- **保守生成**: 检测不到的能力不生成强制规则; 用户未确认的 MCP / skill / workflow capability 不写入项目规范; 已存在的治理文档未经确认不覆盖。
 - **面向审查**: 模板保留来源注释, 便于区分扫描结果、推断内容、用户输入和能力检测结果。
 - **最小安装面**: npm CLI 只负责复制 skill 文件, 不修改目标项目业务代码, 不执行治理生成流程。
 
@@ -31,10 +31,10 @@
 
 分析项目代码库, 自动生成以下治理文档:
 
-- **`constitution.md`** — 安全红线、工作模式与合规约束
-- **`AGENTS.md`** — 项目事实层：技术栈、架构、目录结构、依赖、脚本
-- **`{TOOL}.md`** — 工具入口文件（Claude Code / Gemini / Codex / Kiro / Kimi Code）
-- **`.kimi-code/AGENTS.md`** — 仅 Kimi 目标生成的原生桥接入口
+- **`constitution.md`** - 安全红线、工作模式与合规约束
+- **`AGENTS.md`** - 项目事实层：技术栈、架构、目录结构、依赖、脚本
+- **`{TOOL}.md`** - 工具入口文件（Claude Code / Gemini / Codex / Kiro / Kimi Code）
+- **`.kimi-code/AGENTS.md`** - 仅 Kimi 目标生成的原生桥接入口
 
 核心能力:
 
@@ -44,7 +44,7 @@
 - 检查认证、权限、敏感数据处理和输入校验等安全线索。
 - 检测 API 框架、路由、契约文件、认证入口和 API 测试线索, 并在用户确认后启用 API 治理维度。
 - 按命中的治理维度选择模板, 并收集用户自定义红线。
-- 支持条件生成 MCP / skills 规则, 包括 Semble, TokenSave, Headroom, Context7, Fetch 以及部分文档和架构类 skills。
+- 支持条件生成 MCP / skills / workflow capabilities 规则, 包括 Semble, TokenSave, Headroom, Context7, Fetch, 文档与架构类 skills, 以及 Superpowers、grill-me、OpenSpec 等工作流能力。
 - 生成前扫描目标项目已有治理文档和工具入口, 支持按文件选择合并、覆盖或跳过。
 - Kimi Code 使用完整 `KIMI.md` + 原生 `.kimi-code/AGENTS.md` 双入口, 两个文件分别确认处理策略。
 - 根据项目主语言注入语言专属编码规范模板, 未命中时降级到通用编码规范。
@@ -63,7 +63,7 @@
 ## 工作流
 
 ```
-项目代码 → 并行分析 (5 Agents) → 项目画像 → 建议设置确认 (文件+维度+能力+红线) → 模板填充 → 输出三件套 (Kimi 为四文件)
+项目代码 -> 并行分析 (5 Agents) -> 项目画像 -> 建议设置确认 (文件+维度+能力+红线) -> 模板填充 -> 输出三件套 (Kimi 为四文件)
 ```
 
 ### Phase 1: 并行分析
@@ -80,7 +80,7 @@
 
 ### Phase 2: 建议设置确认
 
-- 一次性呈现项目画像、维度证据、已有文件策略、工具入口、检测到的 MCP / skills 和基线红线。
+- 一次性呈现项目画像、维度证据、已有文件策略、工具入口、检测到的 MCP / skills / workflow capabilities 和基线红线。
 - 用户可按建议生成、一次性调整所有设置或取消；只有多工具入口、已有文件策略或调整内容仍未决时才追加提问。
 - 接受建议即确认已展示的能力与维度；未检测到或未确认的能力不会成为项目强制规则。
 
@@ -88,7 +88,7 @@
 
 根据命中的治理维度选择模板，填充占位符后输出文档。
 
-环境能力规则采用条件生成: 只有当前环境检测到且用户确认启用的 MCP / skill 才会写入 `AGENTS.md`; 工具入口只引用该唯一来源。未检测到或用户跳过的能力不会生成强制规则。
+环境能力规则采用条件生成: 只有当前环境检测到且用户确认启用的 MCP / skill / workflow capability 才会写入 `AGENTS.md`; 工具入口只引用该唯一来源。未检测到或用户跳过的能力不会生成强制规则。
 
 ## 安全与边界
 
@@ -192,15 +192,25 @@ templates/governance/
 | Skill | 文档类 skills | Word/PDF/表格/演示文稿生成与视觉验证 |
 | Skill | `pua` | 失败多次后的换路恢复, 仅用户明确确认时生成 |
 
+### Workflow 路由
+
+工作流类能力仅在检测到且经用户确认后启用, 路由遵循以下规则:
+
+- **小任务默认直接执行**: 明确且范围小的任务不走任何工作流, 直接完成。
+- **`grill-me`**: 适用于小型但有歧义的任务; 每次使用前需取得用户任务级确认, 确认后可重新分类为直接执行或更重的工作流。
+- **Superpowers**: 适用于原因未知的 bug 与中型任务; 必须检测到完整 suite (不能仅凭单个 `brainstorming` 成员判定), 进入后遵循其完整内部链路。
+- **OpenSpec / OPSX**: 适用于大型重构、从 0 构建、新功能模块与系统契约变化; CLI 安装与项目初始化均需用户显式授权, 不得把 CLI 已安装等同于项目已初始化。
+- **互斥**: Superpowers 与 OpenSpec 不得在同一任务中交叉使用, 任一工作流不得调用另一个。
+
 ## 支持的 AI 工具
 
-- **Claude Code** — 生成 `CLAUDE.md`
-- **Gemini CLI** — 生成 `GEMINI.md`
-- **Codex (OpenAI)** — 生成 `CODEX.md`
-- **Kiro** — 生成 `KIRO.md`
-- **Kimi Code CLI** — 生成 `KIMI.md` 与 `.kimi-code/AGENTS.md`
+- **Claude Code** - 生成 `CLAUDE.md`
+- **Gemini CLI** - 生成 `GEMINI.md`
+- **Codex (OpenAI)** - 生成 `CODEX.md`
+- **Kiro** - 生成 `KIRO.md`
+- **Kimi Code CLI** - 生成 `KIMI.md` 与 `.kimi-code/AGENTS.md`
 
-工具入口自动检测优先级: `CLAUDE.md` → `GEMINI.md` → `CODEX.md` → `KIRO.md` → (`KIMI.md` 或 `.kimi-code/AGENTS.md`) → 默认 Claude。任一 Kimi 入口存在即识别为 Kimi; 两者同时存在只算一个工具入口。
+工具入口自动检测优先级: `CLAUDE.md` -> `GEMINI.md` -> `CODEX.md` -> `KIRO.md` -> (`KIMI.md` 或 `.kimi-code/AGENTS.md`) -> 默认 Claude。任一 Kimi 入口存在即识别为 Kimi; 两者同时存在只算一个工具入口。
 
 若目标项目已存在多个工具入口文件, 自动检测结果只作为推荐值; 生成前仍需要用户确认本次更新哪个入口文件。
 
@@ -300,7 +310,12 @@ generate-governance/
 ├── bin/install.js              # npm CLI 安装器
 ├── SKILL.md                    # Skill 定义与完整指令
 ├── workflow-analyze.js         # Workflow 脚本：并行分析 + 项目画像合成
+├── scripts/                    # 一致性检查与离线 eval 脚本
+│   ├── check-consistency.mjs   # 仓库、模板、schema 与发布一致性
+│   └── eval-fixtures.mjs       # 离线 fixture evaluator
+├── examples/                   # 离线 eval fixture (5 组, 23 场景)
 ├── templates/governance/       # 治理文档模板
+├── docs/review-checklist.md    # 生成结果审查清单
 └── README.md
 ```
 
@@ -312,11 +327,11 @@ generate-governance/
 
 ```bash
 npm run check  # 仓库、模板、schema 与发布一致性
-npm run eval   # 4 组离线 fixture、7 个确定性场景
+npm run eval   # 5 组离线 fixture、23 个确定性场景
 npm test       # check + eval + 安装器 dry-run
 ```
 
-离线 eval 只验证证据分类、维度、文件保护和工具入口契约，不调用模型或网络，也不代表模型质量评测。
+离线 eval 只验证证据分类、维度、文件保护、工具入口契约与 workflow 路由契约，不调用模型或网络，也不代表模型质量评测。
 
 ## License
 

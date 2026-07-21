@@ -11,11 +11,11 @@
 
 - 将项目画像, 文件策略, 工具入口, 维度, 环境能力与自定义红线合并为一次建议设置确认; 仅在必选字段未决时追加提问.
 - 将共享能力摘要与 Skill 索引收敛到 `AGENTS.md`, 工具入口只保留引用; 删除重复确认文案与长完成示例.
-- 将 workflow skills 按场景分流: 小型任务默认直接处理, 诊断型 bug 与中型任务使用 Superpowers, 大型任务使用 OpenSpec; Superpowers 与 OpenSpec 互斥.
+- 将 workflow capabilities 按场景分流: 小型任务默认直接处理, 诊断型 bug 与中型任务使用 Superpowers, 大型任务使用 OpenSpec; Superpowers 与 OpenSpec 互斥.
 
 ### Added
 
-- 新增 4 组 fixture 的 `expected.json` 与离线 evaluator, 覆盖 7 个维度、证据、文件保护和工具入口场景.
+- 新增 5 组 fixture (共 23 个场景) 的 `expected.json` 与离线 evaluator, 覆盖证据分类、维度、文件保护、工具入口与 workflow 路由契约.
 - 新增 `grill-me` 任务级确认规则及 workflow 路由离线场景契约.
 
 ## [0.3.0] - 2026-07-17

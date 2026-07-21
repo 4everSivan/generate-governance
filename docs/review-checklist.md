@@ -39,7 +39,7 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 
 ## Environment Capabilities
 
-- MCP and skill rules may be generated only when the capability is detected and confirmed by the user.
+- MCP, skill, and workflow capability rules may be generated only when the capability is detected and confirmed by the user.
 - Missing capabilities must not become project requirements.
 - Capability rules should describe use boundaries and fallback behavior.
 - Clear small tasks must not automatically enter Superpowers; `grill-me` requires task-level confirmation.
