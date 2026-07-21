@@ -1,6 +1,6 @@
 {
   "name": "generate-governance-skill",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Install the generate-governance AI governance skill into a local or user skills directory.",
   "license": "MIT",
   "author": "4everSivan <961014738@qq.com>",

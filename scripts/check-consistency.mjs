@@ -739,9 +739,9 @@ function checkDocConsistency() {
     }
   }
 
-  const unreleased = changelog.match(/## \[Unreleased\]([\s\S]*?)(?=\n## \[|\n$|$)/)
-  if (!unreleased || !/规则分层收敛/.test(unreleased[1])) {
-    fail('CHANGELOG [Unreleased] must summarize the contract-repair changes')
+  const targetSection = changelog.match(/## \[(Unreleased|0\.4\.0)\]([\s\S]*?)(?=\n## \[|\n$|$)/)
+  if (!targetSection || !/规则分层收敛/.test(targetSection[2])) {
+    fail('CHANGELOG [Unreleased] or [0.4.0] must summarize the contract-repair changes')
   }
 }
 

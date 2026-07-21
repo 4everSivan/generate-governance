@@ -301,7 +301,7 @@ generate-governance-skill install --project .
 
 ## 发布状态
 
-当前 npm 包版本为 `0.3.0`。发布内容见 `CHANGELOG.md`。
+当前 npm 包版本为 `0.4.0`。发布内容见 `CHANGELOG.md`。
 
 ## 项目结构
 
