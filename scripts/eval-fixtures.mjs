@@ -573,6 +573,77 @@ function validateSkillRoutingSuite(expected, suiteName) {
   }
 }
 
+// Decision gates model the approved, high-risk confirmation boundary. They are
+// deliberately pure fixture logic: no history lookup, filesystem scan, merge,
+// or write is performed here.
+const decisionGroupPriority = ['existing-file', 'evidence-policy', 'scope-capability']
+const knownHistoryStatuses = new Set(['not-checked', 'unavailable', 'checked'])
+
+function orderedDecisionGroups(groups) {
+  return [...new Set(groups)].sort((left, right) => {
+    const leftPriority = decisionGroupPriority.indexOf(left)
+    const rightPriority = decisionGroupPriority.indexOf(right)
+    const normalizedLeft = leftPriority === -1 ? Number.MAX_SAFE_INTEGER : leftPriority
+    const normalizedRight = rightPriority === -1 ? Number.MAX_SAFE_INTEGER : rightPriority
+    return normalizedLeft - normalizedRight || left.localeCompare(right)
+  })
+}
+
+function classifyDecisionGate(input) {
+  const protectedWrite = input.protected_write === true
+  const semanticMapReady = input.semantic_map_ready === true
+  const weakEvidenceEnabled = input.weak_evidence_enabled === true
+  const weakEvidenceConfirmed = input.weak_evidence_confirmed === true
+  const policyConflict = input.policy_conflict === true
+  const scopeConflict = input.scope_conflict === true
+  const additionalGroups = Array.isArray(input.additional_blocking_groups)
+    ? input.additional_blocking_groups
+      .filter((group) => typeof group === 'string' && group.trim() !== '')
+      .map((group) => group.trim())
+    : []
+  const blockingGroups = []
+
+  if (protectedWrite && !semanticMapReady) blockingGroups.push('existing-file')
+  if (weakEvidenceEnabled && !weakEvidenceConfirmed) blockingGroups.push('evidence-policy')
+  if (policyConflict) blockingGroups.push('evidence-policy')
+  if (scopeConflict) blockingGroups.push('scope-capability')
+  blockingGroups.push(...additionalGroups)
+
+  const orderedGroups = orderedDecisionGroups(blockingGroups)
+  // risk_triggered preserves the need for Preview + Apply after a prior
+  // conflict was resolved; it is not a request to perform an extra scan.
+  const riskTriggered = input.risk_triggered === true
+    || protectedWrite
+    || weakEvidenceEnabled
+    || policyConflict
+    || scopeConflict
+  const requiresApply = riskTriggered
+
+  return {
+    history_status: knownHistoryStatuses.has(input.history_status) ? input.history_status : 'not-checked',
+    semantic_map_required: protectedWrite,
+    requires_preview: riskTriggered,
+    requires_apply: requiresApply,
+    question_groups: orderedGroups.slice(0, 3),
+    remaining_blocking_groups: orderedGroups.slice(3),
+    write_allowed: orderedGroups.length === 0 && (!requiresApply || input.apply_requested === true),
+  }
+}
+
+function validateDecisionGateSuite(expected, suiteName) {
+  if (!requireObject(expected.cases, `${suiteName}.cases`)) return
+
+  for (const [caseName, expectedCase] of Object.entries(expected.cases)) {
+    const casePath = `${suiteName}.cases.${caseName}`
+    if (!requireObject(expectedCase, casePath)) continue
+    if (!requireObject(expectedCase.input, `${casePath}.input`)) continue
+    if (!requireObject(expectedCase.expected, `${casePath}.expected`)) continue
+
+    const observation = classifyDecisionGate(expectedCase.input)
+    compare(observation, expectedCase.expected, `${casePath}.expected`)
+  }
+}
+
 // Resolve a capability id to its template condition token via the shared
 // capability map (single source of truth shared with check-consistency.mjs).
 function capabilityToken(id) {
@@ -865,6 +936,18 @@ function validateTemplateCompositionSuite(expected, suiteName) {
         fail(`${casePath}.expected.agents_has_openspec_reference`, `expected ${exp.agents_has_openspec_reference}, received ${has}`)
       }
     }
+    if (exp.agents_has_validation_gaps !== undefined && agentsRendered !== undefined) {
+      const has = /事实置信度与验证边界/.test(agentsRendered)
+      if (has !== exp.agents_has_validation_gaps) {
+        fail(`${casePath}.expected.agents_has_validation_gaps`, `expected ${exp.agents_has_validation_gaps}, received ${has}`)
+      }
+    }
+    if (exp.constitution_has_validation_gaps !== undefined && constitutionRendered !== undefined) {
+      const has = /事实置信度与验证边界/.test(constitutionRendered)
+      if (has !== exp.constitution_has_validation_gaps) {
+        fail(`${casePath}.expected.constitution_has_validation_gaps`, `expected ${exp.constitution_has_validation_gaps}, received ${has}`)
+      }
+    }
     if (exp.agents_has_superpowers_reference_in_mutex !== undefined && agentsRendered !== undefined) {
       // Only counts Superpowers mentions inside a mutual-exclusion rule line, which should not exist.
       const mutexLines = agentsRendered.split('\n').filter((line) => /互斥/.test(line))
@@ -932,6 +1015,9 @@ for (const suiteName of suites) {
   } else if (expected.kind === 'skill-routing-cases') {
     scenarioCount += isObject(expected.cases) ? Object.keys(expected.cases).length : 0
     validateSkillRoutingSuite(expected, suiteName)
+  } else if (expected.kind === 'decision-gate-cases') {
+    scenarioCount += isObject(expected.cases) ? Object.keys(expected.cases).length : 0
+    validateDecisionGateSuite(expected, suiteName)
   } else if (expected.kind === 'capability-profile-cases') {
     scenarioCount += isObject(expected.cases) ? Object.keys(expected.cases).length : 0
     validateCapabilityProfileSuite(expected, suiteName)

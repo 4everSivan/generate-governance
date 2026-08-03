@@ -206,4 +206,17 @@
 {{#has_workflow_superpowers_and_openspec}}
 > Superpowers 与 OpenSpec 互斥, 详见 `constitution.md` 工作流互斥红线.
 {{/has_workflow_superpowers_and_openspec}}
+
+{{#has_validation_gaps}}
+---
+
+## 11. 事实置信度与验证边界
+
+以下是本次生成范围内仍需后续验证的项目事实. 不得据此补造项目事实, 放宽 `constitution.md` 红线, 或替代用户确认.
+
+| 事项 | 当前依据 | 置信度 | 后续约束 |
+|------|----------|--------|----------|
+{{VALIDATION_GAPS_TABLE}}
+<!-- source: review-context/validation-gaps, confirmed: true -->
+{{/has_validation_gaps}}
 <!-- /source: template/base -->

@@ -116,6 +116,24 @@ subagent 返回的是结构化文本, 主 agent 负责提取关键字段组装 p
 - `confirmed_dimensions`: 展示每个维度的证据与 confidence; code 始终命中, 弱证据维度必须显式标注.
 - `confirmed_capabilities`: 只列出当前环境检测到的 MCP/skills/workflow capabilities 及将启用的规则; 接受建议即确认这些能力.
 - `user_redlines`: 展示模板基线红线; 默认无额外用户红线, 可在调整时按维度补充.
+- `review_context`: 只从 Phase 1 已有结果和本次用户回复派生的短暂审查上下文, 用于判断是否需要高风险预览与 `Apply`; 不写入决策日志或新增项目文件.
+
+### Phase 2.1: 审查上下文与受限决策门控
+
+`review_context` 只服务本次确认, 不新增扫描 agent、CLI、Git 历史检查或持久化文件. 它最多包含:
+
+- `protected_writes`: 已存在且策略为 merge / overwrite 的目标文件.
+- `semantic_maps`: 每个 `protected_write` 的有界语义映射: 目标文件与段落/事实分类、当前内容依据、拟议动作、保留的 user-custom 内容及仍有歧义的边界.
+- `weak_evidence`: 将要启用但 evidence 或 confidence 为 LOW / UNKNOWN 的维度、能力或事实.
+- `policy_or_scope_conflicts`: 已展示的现有治理规则冲突、工具入口冲突或用户范围冲突.
+- `history_status`: 仅为 `not-checked`、`unavailable` 或 `checked`; 默认 `not-checked`. 只有用户明确要求审计，或已展示现有治理冲突且用户同意后，才可以检查 Git 历史。历史不可用只报告 `unavailable`，不得推断“历史安全”，也不得为此新增扫描步骤。
+- `validation_gaps`: 已确认输出范围内仍需后续验证的项目事实；仅在最终列表非空时进入 AGENTS 的事实边界表。
+
+以下任一项触发高风险门控: 对已存在文件执行 merge / overwrite、启用弱证据内容、或存在未解决的规则/范围冲突。新建且高置信度的文件保持原有的一次确认，不增加 Preview / Apply。
+
+高风险场景先合并相近问题，再最多呈现三组且按影响排序: (1) 既有文件写入边界，(2) 证据与项目规则冲突，(3) 工具、能力或范围冲突。每个推荐项必须同时给出一个真实替代项及其代价；但文件策略仍保留 merge / overwrite / skip 三个原生选项。超过三组的未决项必须列为剩余阻塞，不得因未展示而允许写入。
+
+merge / overwrite 必须先完成对应 `semantic_map`; 无法给出有界映射时，不得合并或覆盖，只能请求澄清或选择 skip。`validation_gaps` 只能记录最终生成文件中仍待验证的项目事实，绝不记录文件策略、历史状态、待执行 `Apply`、提问过程或其他临时决策状态。
 
 检测候选 MCP 服务:
 
@@ -215,7 +233,7 @@ Superpowers 额外字段:
 
 将项目画像与 confidence, 维度证据, 文件策略, 工具入口, 能力规则摘要, 基线红线和待确认项放在同一消息中. 若已有 `constitution.md`, 同时提示维度应与现有项目治理对齐.
 
-无未决必选项时使用 AskUserQuestion:
+无高风险触发且无未决必选项时使用 AskUserQuestion:
 
 ```
 header: "生成设置"
@@ -229,7 +247,7 @@ options:
     description: "不写入任何文件"
 ```
 
-多个不同工具入口并存等未决必选项存在时, 不提供可直接写入的"按建议生成"; 改为"补充选择"或"取消", 并只收集未决字段.
+多个不同工具入口并存等未决必选项存在时, 不提供可直接写入的"按建议生成"; 改为"补充选择"或"取消", 并只收集未决字段. 高风险触发时, "按建议生成"只确认建议设置, 不得直接进入写入；必须完成下述 Preview / Apply。
 
 选择"调整"时一次性收集结构化修正; 未列出的字段沿用已展示建议:
 
@@ -242,13 +260,19 @@ redlines.database:
 - 禁止生产环境执行未审查 DDL
 ```
 
-只有以下情况允许追加提问: 调整回复缺少必选字段; 多工具入口仍未选择; 已存在文件仍无策略. 追加问题只询问缺失字段, 不重复已确认内容.
+除高风险门控中的最多三组问题外，只有以下情况允许追加提问: 调整回复缺少必选字段; 多工具入口仍未选择; 已存在文件仍无策略. 追加问题只询问缺失字段, 不重复已确认内容.
 
-**Codex 降级路径交互**: 若无 `AskUserQuestion`, 输出同一建议设置摘要并要求回复 `按建议生成` / `调整: <结构化修正>` / `取消`. 多工具入口未决时要求在调整中指定 `tool`.
+**Codex 降级路径交互**: 若无 `AskUserQuestion`, 输出同一建议设置摘要并要求回复 `按建议生成` / `调整: <结构化修正>` / `取消`. 多工具入口未决时要求在调整中指定 `tool`. 高风险场景改为先收集门控问题、展示 Preview，再要求用户回复精确的 `Apply`；不得把“按建议生成”或旧回复解释为 `Apply`.
 
-确认后得到最终 `tool`, `file_strategies`, `confirmed_dimensions`, `confirmed_capabilities`, `user_redlines`. 选择取消则不写任何文件.
+确认后得到最终 `tool`, `file_strategies`, `confirmed_dimensions`, `confirmed_capabilities`, `user_redlines`, `review_context`. 选择取消则不写任何文件.
 
-**红线:** 未确认不得写入; 已存在文件必须有策略; 多工具入口不得静默选择; Kimi 两个文件分别记录策略; 弱证据维度不得静默启用; 未检测或未确认的能力不得写成项目强制规则; Superpowers 与 OpenSpec 不得在同一任务中交叉使用.
+**红线:** 未确认不得写入; 已存在文件必须有策略; 高风险必须 Preview 后取得精确 `Apply`; 无 `semantic_map` 不得 merge / overwrite; 多工具入口不得静默选择; Kimi 两个文件分别记录策略; 弱证据维度不得静默启用; 未检测或未确认的能力不得写成项目强制规则; Superpowers 与 OpenSpec 不得在同一任务中交叉使用.
+
+### Phase 2.5: 高风险预览与 Apply
+
+所有高风险问题解决后，生成只覆盖本次目标的 Preview。Preview 至少逐文件列出路径、create / merge / overwrite / skip 策略、每个 merge / overwrite 的 `semantic_map` 摘要、将写入的 `validation_gaps`（如有）和仍然阻塞的项。它不是写入操作，也不创建备份、日志或额外扫描结果。
+
+仅当 Preview 不含剩余阻塞且用户在当前轮明确选择 `Apply`，才可进入 Phase 3。任何策略、语义映射、范围或证据调整都会使旧 Preview 失效，必须重新预览；用户可改为 skip 或取消。若高风险门控未触发，Phase 2 的一次确认即可进入 Phase 3。
 
 ## Phase 3: 模板填充与生成
 
@@ -341,6 +365,7 @@ API 维度影响优先级:
 | `{{API_CONFIDENCE}}` | profile.api_summary.confidence | API 维度检测置信度 |
 | `{{CAPABILITIES_SUMMARY}}` | confirmed_capabilities | 已确认能力的名称、确认状态与检测依据摘要; 不输出规则正文 |
 | `{{LANGUAGE_CODE_STANDARDS}}` | profile.language + code-standards 模板 | 语言专属编码规范, 未命中时使用 generic |
+| `{{VALIDATION_GAPS_TABLE}}` | derived_review_context.validation_gaps | 最终仍待验证的项目事实表行; 只在 AGENTS 的 `has_validation_gaps` 条件内使用 |
 
 **条件 block 语法:**
 - `{{#has_db}}...{{/has_db}}` — 命中 database 维度时展开 inline 内容 (用于角色描述中的子句)
@@ -359,12 +384,13 @@ API 维度影响优先级:
 - `{{#has_skill_artifacts}}...{{/has_skill_artifacts}}` — 检测到并经用户确认文档/表格/演示/PDF 类 skill 时展开
 - `{{#has_skill_pua}}...{{/has_skill_pua}}` — 检测到并经用户明确确认 `pua` skill 时展开
 - `{{#has_workflow_superpowers_and_openspec}}...{{/has_workflow_superpowers_and_openspec}}` - Superpowers 与 OpenSpec 均确认时展开, 生成 constitution 互斥红线
+- `{{#has_validation_gaps}}...{{/has_validation_gaps}}` — 最终 `review_context.validation_gaps` 非空时仅在 AGENTS 展开事实置信度与验证边界表
 
-能力 block 只有在 `detected && confirmed` 同时成立时展开 (Superpowers 还需 `complete === true`); 派生组合条件在其依赖能力均确认时成立. 条件 inline (`{{#has_*}}`) 同理. 维度内容通过 `{{DIMENSION_SECTIONS}}` 按固定顺序插入, 不使用 `{{#dim-*}}` block 标签.
+能力 block 只有在 `detected && confirmed` 同时成立时展开 (Superpowers 还需 `complete === true`); 派生组合条件在其依赖能力均确认时成立. 条件 inline (`{{#has_*}}`) 同理. `has_validation_gaps` 不属于能力条件，且不得在 constitution 或工具入口展开。维度内容通过 `{{DIMENSION_SECTIONS}}` 按固定顺序插入, 不使用 `{{#dim-*}}` block 标签.
 
 ### 3.3 写入输出文件
 
-所有工具写入共享治理文件与所选工具入口:
+完成 Phase 2 的普通确认，或高风险 Preview 后获得当前轮精确 `Apply`，才可写入共享治理文件与所选工具入口:
 
 ```
 <target-path>/constitution.md
@@ -376,10 +402,11 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 
 已存在文件处理:
 1. 使用 Phase 2 已确认的文件级策略: 覆盖 (备份到 `.governance-backup/`) / 合并 / 跳过.
-2. 覆盖模式: 分别备份旧文件, 写入新文件.
-3. 合并模式: 保留对应旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新; 标记外存在用户文本时先警告, 不静默丢弃.
-4. 跳过: 不写入.
-5. 若 Phase 2 未记录某个已存在文件的处理策略, 必须暂停并再次询问, 不得默认覆盖.
+2. 对每个 merge / overwrite，先确认 Phase 2.1 的有界 `semantic_map`，再使用 Phase 2.5 已确认的 Preview；缺少其一必须暂停，不得把当前文件整体当作可安全替换。
+3. 覆盖模式: 分别备份旧文件, 写入新文件.
+4. 合并模式: 保留对应旧文件中 `<!-- user-custom -->...<!-- /user-custom -->` 标记的内容, 其余更新; 标记外存在用户文本时先警告, 不静默丢弃.
+5. 跳过: 不写入.
+6. 若 Phase 2 未记录某个已存在文件的处理策略, 必须暂停并再次询问, 不得默认覆盖.
 
 ### 3.4 来源标注
 
@@ -391,11 +418,14 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 <!-- source: infer, confidence: MEDIUM -->
 <!-- source: user-input -->
 <!-- source: capability-detect, confirmed: true -->
+<!-- source: review-context/validation-gaps, confirmed: true -->
 ```
 
 ## Phase 4: 完成摘要
 
-展示每个目标文件的 create/merge/overwrite/skip/failed 状态, 已确认的维度与能力, 以及所有 LOW/UNKNOWN confidence 或缺失证据项. Kimi 需分别报告 `KIMI.md` 与 `.kimi-code/AGENTS.md`; 不得在任一入口失败时宣称四文件完整. 提醒用户重点审查 infer 和 user-input 来源段落.
+展示每个目标文件的 create/merge/overwrite/skip/failed 状态, 已确认的维度与能力, 以及所有 LOW/UNKNOWN confidence 或缺失证据项. 高风险场景还必须说明 Preview / Apply 是否完成、`history_status`，并列出 `validation_gaps`；只在最终摘要中呈现这些决策状态，不创建持久化决策日志。Kimi 需分别报告 `KIMI.md` 与 `.kimi-code/AGENTS.md`; 不得在任一入口失败时宣称四文件完整. 提醒用户重点审查 infer 和 user-input 来源段落。
+
+高风险完成后，附上最多三条可追溯的人工复核问题，每条指向对应文件、来源注释或 `validation_gaps` 表行。它们是非阻塞复核，不要求用户答题，不得伪装为新的确认或验收门槛。
 
 ## 错误处理
 
@@ -406,6 +436,10 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 | Workflow 部分 agent 失败 | 标注该维度数据盲区, 其余正常 |
 | 多个工具入口同时存在 | 提示用户选择本次生成/更新的工具入口 |
 | 已有治理文档但用户未确认处理策略 | 停止写入该文件, 询问合并/覆盖/跳过 |
+| merge / overwrite 缺少有界语义映射 | 不生成 Preview，不写入该文件；请求补充映射或选择 skip |
+| 高风险 Preview 后未收到当前轮精确 `Apply` | 不写入、不备份；保留为待用户决定的交互状态 |
+| 超过三组未决问题 | 仅展示优先级最高的三组，但把其余列为阻塞；不得写入 |
+| Git 历史未检查或不可用 | 仅报告 `not-checked` / `unavailable`，不推断历史安全，也不新增检查 |
 | `.kimi-code` 是普通文件或目录不可创建 | 不写入原生桥接文件并报告明确错误; 不宣称 Kimi 四文件完整 |
 | 跳过的 `.kimi-code/AGENTS.md` 未引用 `KIMI.md` | 警告 Kimi 可能不会加载完整工具入口 |
 | Kimi 桥接引用的根治理文件缺失或被跳过 | 在完成摘要中列为待确认项 |
@@ -424,6 +458,7 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 - [ ] Workflow 返回有效项目画像
 - [ ] 已扫描现有治理文档和工具入口
 - [ ] 已确认已有文件的合并/覆盖/跳过策略
+- [ ] merge / overwrite 均有有界语义映射；无映射的目标已 skip 或仍处于阻塞
 - [ ] Kimi 双入口已按一个工具识别, 两个文件分别确认策略
 - [ ] 仅在确认 Kimi 后创建 `.kimi-code/`, 完成摘要报告四文件状态
 - [ ] 维度判定正确
@@ -431,10 +466,14 @@ Kimi 的 `{TOOL}.md` 为 `KIMI.md`, 并额外写入 `<target-path>/.kimi-code/AG
 - [ ] 能力检测完成, 未检测到的能力未写入强制规则
 - [ ] 用户确认的 MCP/skills/workflow capabilities 条件 block 正确展开
 - [ ] Phase 2 建议设置已一次性确认; 追加提问仅覆盖未决字段
+- [ ] 高风险问题最多分为三组；剩余未决项未被静默放行
+- [ ] 高风险 Preview 已展示，且当前轮收到精确 `Apply` 后才写入
+- [ ] `validation_gaps` 只包含最终待验证事实，未包含文件策略、历史或临时交互状态
 - [ ] 模板选择正确
 - [ ] 语言专属编码规范模板选择正确
 - [ ] 占位符全部填充, 无残留 `{{ }}`
 - [ ] 维度 block 正确展开/删除
 - [ ] 已存在文件正确处理
 - [ ] 来源标注清晰
+- [ ] 高风险完成摘要含非阻塞、可追溯的人工复核问题
 - [ ] 未做 git commit

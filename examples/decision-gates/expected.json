@@ -1,0 +1,134 @@
+{
+  "kind": "decision-gate-cases",
+  "cases": {
+    "fresh-high-confidence": {
+      "input": {},
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": false,
+        "requires_preview": false,
+        "requires_apply": false,
+        "question_groups": [],
+        "remaining_blocking_groups": [],
+        "write_allowed": true
+      }
+    },
+    "protected-write-needs-semantic-map": {
+      "input": {
+        "protected_write": true
+      },
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": true,
+        "requires_preview": true,
+        "requires_apply": true,
+        "question_groups": [
+          "existing-file"
+        ],
+        "remaining_blocking_groups": [],
+        "write_allowed": false
+      }
+    },
+    "protected-write-ready-waits-for-apply": {
+      "input": {
+        "protected_write": true,
+        "semantic_map_ready": true
+      },
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": true,
+        "requires_preview": true,
+        "requires_apply": true,
+        "question_groups": [],
+        "remaining_blocking_groups": [],
+        "write_allowed": false
+      }
+    },
+    "protected-write-ready-after-apply": {
+      "input": {
+        "protected_write": true,
+        "semantic_map_ready": true,
+        "apply_requested": true
+      },
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": true,
+        "requires_preview": true,
+        "requires_apply": true,
+        "question_groups": [],
+        "remaining_blocking_groups": [],
+        "write_allowed": true
+      }
+    },
+    "weak-evidence-needs-confirmation": {
+      "input": {
+        "weak_evidence_enabled": true
+      },
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": false,
+        "requires_preview": true,
+        "requires_apply": true,
+        "question_groups": [
+          "evidence-policy"
+        ],
+        "remaining_blocking_groups": [],
+        "write_allowed": false
+      }
+    },
+    "weak-evidence-confirmed-waits-for-apply": {
+      "input": {
+        "weak_evidence_enabled": true,
+        "weak_evidence_confirmed": true
+      },
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": false,
+        "requires_preview": true,
+        "requires_apply": true,
+        "question_groups": [],
+        "remaining_blocking_groups": [],
+        "write_allowed": false
+      }
+    },
+    "more-than-three-unresolved-groups-stay-blocking": {
+      "input": {
+        "policy_conflict": true,
+        "scope_conflict": true,
+        "additional_blocking_groups": [
+          "late-risk",
+          "aftercare-risk"
+        ]
+      },
+      "expected": {
+        "history_status": "not-checked",
+        "semantic_map_required": false,
+        "requires_preview": true,
+        "requires_apply": true,
+        "question_groups": [
+          "evidence-policy",
+          "scope-capability",
+          "aftercare-risk"
+        ],
+        "remaining_blocking_groups": [
+          "late-risk"
+        ],
+        "write_allowed": false
+      }
+    },
+    "history-unavailable-is-state-not-safety-claim": {
+      "input": {
+        "history_status": "unavailable"
+      },
+      "expected": {
+        "history_status": "unavailable",
+        "semantic_map_required": false,
+        "requires_preview": false,
+        "requires_apply": false,
+        "question_groups": [],
+        "remaining_blocking_groups": [],
+        "write_allowed": true
+      }
+    }
+  }
+}

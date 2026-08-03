@@ -15,6 +15,7 @@
     "TOPOLOGY_SECTION": "n/a",
     "LANGUAGE_CODE_STANDARDS": "generic",
     "CAPABILITIES_SUMMARY": "(none)",
+    "VALIDATION_GAPS_TABLE": "| API 鉴权入口 | 未检测 | LOW | 生成后人工核验，未验证前不得放宽相关规则 |",
     "LANGUAGE": "Go",
     "FRAMEWORK": "-",
     "BUILD_SYSTEM": "go",
@@ -56,7 +57,9 @@
         "unbalanced_conditions": 0,
         "mutex_red_lines": 0,
         "agents_has_openspec_reference": false,
-        "agents_has_superpowers_reference": false
+        "agents_has_superpowers_reference": false,
+        "agents_has_validation_gaps": false,
+        "constitution_has_validation_gaps": false
       }
     },
     "only-superpowers": {
@@ -135,6 +138,22 @@
         "unbalanced_conditions": 0,
         "dim_sections_under_dimension_facts": true,
         "capabilities_after_dimensions": true
+      }
+    },
+    "validation-gaps": {
+      "input": {
+        "dimensions": [
+          "code"
+        ],
+        "conditions": {
+          "has_validation_gaps": true
+        }
+      },
+      "expected": {
+        "unresolved_tokens": 0,
+        "unbalanced_conditions": 0,
+        "agents_has_validation_gaps": true,
+        "constitution_has_validation_gaps": false
       }
     },
     "unknown-dimension": {

@@ -505,6 +505,70 @@ function checkConsolidatedConfirmationContract() {
   }
 }
 
+function checkDecisionGateContract() {
+  const skillMd = read('SKILL.md')
+  const agents = read('templates/governance/agents/base.md')
+  const checklist = read('docs/review-checklist.md')
+  const templateFiles = walk('templates').filter((file) => file.endsWith('.md'))
+
+  for (const fragment of [
+    '### Phase 2.1: 审查上下文与受限决策门控',
+    '### Phase 2.5: 高风险预览与 Apply',
+    '`semantic_map`',
+    '`history_status`',
+    '`validation_gaps`',
+    '最多呈现三组',
+    '不新增扫描 agent',
+    '新建且高置信度的文件保持原有的一次确认',
+    '当前轮明确选择 `Apply`',
+    '不创建持久化决策日志',
+  ]) {
+    if (!skillMd.includes(fragment)) {
+      fail(`SKILL.md missing decision-gate safeguard: ${fragment}`)
+    }
+  }
+
+  const validationBlock = agents.match(/\{\{#has_validation_gaps\}\}([\s\S]*?)\{\{\/has_validation_gaps\}\}/)
+  if (!validationBlock) {
+    fail('AGENTS must conditionally render the validation-gap fact boundary')
+  } else {
+    for (const fragment of [
+      '## 11. 事实置信度与验证边界',
+      '{{VALIDATION_GAPS_TABLE}}',
+      '不得据此补造项目事实',
+    ]) {
+      if (!validationBlock[1].includes(fragment)) {
+        fail(`AGENTS validation-gap block missing required content: ${fragment}`)
+      }
+    }
+    for (const forbidden of ['history_status', 'semantic_map', 'Apply', 'review_context']) {
+      if (validationBlock[1].includes(forbidden)) {
+        fail(`AGENTS validation-gap block must not persist temporary gate state: ${forbidden}`)
+      }
+    }
+  }
+
+  const validationConsumers = templateFiles.filter((file) => {
+    const content = read(file)
+    return content.includes('{{#has_validation_gaps}}') || content.includes('{{VALIDATION_GAPS_TABLE}}')
+  })
+  const allowedConsumer = 'templates/governance/agents/base.md'
+  if (validationConsumers.length !== 1 || validationConsumers[0] !== allowedConsumer) {
+    fail(`Validation-gap tokens must be consumed only by ${allowedConsumer}; found ${validationConsumers.join(', ') || 'none'}`)
+  }
+
+  for (const fragment of [
+    '## Decision Gates',
+    'Git history is not a default scan',
+    '`validation_gaps` may contain only final, still-unverified project facts',
+    'checkDecisionGateContract',
+  ]) {
+    if (!checklist.includes(fragment)) {
+      fail(`Review checklist missing decision-gate guard: ${fragment}`)
+    }
+  }
+}
+
 // Collect every {{#has_mcp_*}} / {{#has_skill_*}} / {{#has_workflow_*}} capability
 // condition token actually used in templates. Dimension inline tokens (has_db,
 // has_api, has_deploy, has_maintenance) are NOT capability tokens.
@@ -728,6 +792,7 @@ function checkDocConsistency() {
 
   for (const fragment of [
     'checkCapabilityMappings',
+    'checkDecisionGateContract',
     'checkTemplateLayering',
     'template-contract.mjs',
     'Workflow transitions',
@@ -834,6 +899,7 @@ checkKimiDocumentationContract()
 checkInstructionHierarchy()
 checkReadmeVersion()
 checkConsolidatedConfirmationContract()
+checkDecisionGateContract()
 checkCapabilityMappings()
 checkCapabilityMappingParserContract()
 checkTemplateLayering()

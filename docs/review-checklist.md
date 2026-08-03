@@ -38,6 +38,16 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 - `KIMI.md` and `.kimi-code/AGENTS.md` together count as one Kimi tool, but their file strategies must be confirmed separately.
 - Merge mode may preserve `<!-- user-custom -->...<!-- /user-custom -->` sections, but should not silently drop user text outside those sections without warning.
 
+## Decision Gates
+
+- Keep the normal single confirmation for new, high-confidence files; do not add Preview / Apply where it does not change the write risk.
+- A merge or overwrite of an existing governance file requires a bounded semantic map before Preview. The map must identify the target section or fact class, evidence, intended action, preserved user-custom content, and unresolved ambiguity; it is not a full-document diff or a persistent decision log.
+- High-risk Preview must enumerate every target file and its strategy. Writing may begin only after the current-turn, explicit `Apply`; a prior “按建议生成” is not an Apply.
+- Consolidate high-risk questions into at most three priority groups. Any remaining unresolved group must remain a write blocker rather than disappearing from the conversation.
+- Git history is not a default scan. It may be checked only for an explicit audit request, or after an existing governance conflict is shown and the user consents; report only `checked`, `not-checked`, or `unavailable`.
+- `validation_gaps` may contain only final, still-unverified project facts. Render it in the conditional AGENTS fact-boundary section, never in constitution or tool entries, and never include history, file strategy, pending Apply, or question state.
+- After a high-risk completion, provide at most three traceable and nonblocking human review questions. They should help review the result, not create a hidden acceptance test.
+
 ## Environment Capabilities
 
 - MCP, skill, and workflow capability rules may be generated only when the capability is detected and confirmed by the user.
@@ -66,6 +76,7 @@ This checklist covers professional judgment that should stay human-reviewed. Aut
 | Instruction hierarchy | constitution/AGENTS templates | `checkInstructionHierarchy` | Never place project files above platform or system instructions |
 | ProjectProfile and template fields | `workflow-analyze.js` + SKILL source table | `checkTemplateTokenSources`, `checkProfileTokenSources` | Move schemas to machine checks; do not invent missing facts |
 | Consolidated confirmation | SKILL Phase 2 | `checkConsolidatedConfirmationContract` + fixture governance expectations | Remove repeated prompts, not existing-file or ambiguity gates |
+| Decision gates | SKILL Phase 2.1 / 2.5 + AGENTS validation-gap block | `checkDecisionGateContract` + decision-gate and template-composition fixture cases | Add Preview / Apply only for protected writes, weak evidence, or conflicts; no new scans or persistent logs |
 | Kimi dual entry | SKILL + Kimi templates | `checkKimiSkillContract`, Kimi fixture cases | Share tool detection; preserve per-file strategies and failure reporting |
 | Shared capabilities | AGENTS template | `checkToolEntryTemplates` | Keep one shared source; tool entries only reference it |
 | Capability mapping | SKILL mapping table (parsed by `capability-map.mjs`) | `checkCapabilityMappings`, `checkCapabilityMappingParserContract` | Single source of truth; duplicate detection names and conflicting id/kind/token/group declarations fail; grouped capabilities declare semantics |
